@@ -41,11 +41,32 @@
 
   var SPACER_LENGTH = 20;
 
-  /* The base each family deaminates on the protospacer strand, and the
-     product it becomes. Everything downstream derives from this table. */
+  /* The base each family deaminates on the protospacer strand, and what it
+     becomes. Everything downstream derives from this table.
+     `to` is the intended product. `products` lists every outcome the editor
+     actually makes at an edited base: transition editors resolve cleanly to
+     one, but adenine-transversion editors leave an abasic intermediate that
+     cellular repair resolves several ways, so they declare all of them. */
   var FAMILY = {
-    ABE: { from: "A", to: "G", senseBase: "A", antisenseBase: "T", label: "A→G" },
-    CBE: { from: "C", to: "T", senseBase: "C", antisenseBase: "G", label: "C→T" }
+    ABE: {
+      from: "A", to: "G", senseBase: "A", antisenseBase: "T", label: "A→G",
+      mixedProducts: false,
+      products: [{ base: "G", kind: "intended" }]
+    },
+    CBE: {
+      from: "C", to: "T", senseBase: "C", antisenseBase: "G", label: "C→T",
+      mixedProducts: false,
+      products: [{ base: "T", kind: "intended" }]
+    },
+    AYE: {
+      from: "A", to: "C", senseBase: "A", antisenseBase: "T", label: "A→Y (C or T)",
+      mixedProducts: true,
+      products: [
+        { base: "C", kind: "intended",  note: "predominant transversion product" },
+        { base: "T", kind: "alternate", note: "second transversion product" },
+        { base: "G", kind: "byproduct", note: "residual transition from the ABE chemistry" }
+      ]
+    }
   };
 
   /* ------------------------------------------------------------------ *
@@ -176,7 +197,11 @@
           targetIndex: target,
           bystanderIndices: bystanders.map(function (w) { return toSenseIndex(start, w); }),
           gc: gcPercent(spacer),
-          hasPolyT: /TTTT/.test(spacer)
+          hasPolyT: /TTTT/.test(spacer),
+          context: targetContext(spacer, pos),
+          contextFavorable: ed.favorableContexts
+            ? ed.favorableContexts.indexOf(targetContext(spacer, pos)) >= 0
+            : null
         });
       }
     }
@@ -187,12 +212,18 @@
    * Protein consequence
    * ------------------------------------------------------------------ */
 
-  /** Apply base-editor edits at the given sense-strand indices. */
-  function applyEdits(seq, family, strand, senseIndices) {
+  /**
+   * Apply base-editor edits at the given sense-strand indices.
+   * @param {string} [productBase] which product to install on the protospacer
+   *   strand; defaults to the family's intended product.
+   */
+  function applyEdits(seq, family, strand, senseIndices, productBase) {
     var f = FAMILY[family];
+    var product = productBase || f.to;
+    var written = strand === "+" ? product : reverseComplement(product);
     var chars = seq.split("");
     for (var i = 0; i < senseIndices.length; i++) {
-      chars[senseIndices[i]] = strand === "+" ? f.to : reverseComplement(f.to);
+      chars[senseIndices[i]] = written;
     }
     return chars.join("");
   }
@@ -202,9 +233,9 @@
    * @param {number} frame  0-based index of the first base of codon 1, or -1 for non-coding
    * @returns {Array|null}  one entry per affected codon
    */
-  function codonEffects(seq, frame, family, strand, senseIndices) {
+  function codonEffects(seq, frame, family, strand, senseIndices, productBase) {
     if (frame < 0 || !senseIndices.length) return null;
-    var edited = applyEdits(seq, family, strand, senseIndices);
+    var edited = applyEdits(seq, family, strand, senseIndices, productBase);
     var seen = {};
     var changes = [];
 
@@ -242,6 +273,44 @@
       " (" + AA3[change.from] + "→" + AA3[change.to] + ")";
   }
 
+  /**
+   * Every outcome an editor can produce at one edited base, with the protein
+   * consequence of each. For a transition editor this is a single row; for an
+   * adenine-transversion editor it is the full product spectrum, which is the
+   * thing that actually has to be designed around.
+   *
+   * @returns {Array} [{base, kind, note, effect|null, description}]
+   */
+  function outcomeSpectrum(seq, frame, family, strand, senseIndex) {
+    var f = FAMILY[family];
+    if (!f) throw new Error("Unknown editor family: " + family);
+
+    return f.products.map(function (product) {
+      var onStrand = strand === "+" ? product.base : reverseComplement(product.base);
+      var changes = codonEffects(seq, frame, family, strand, [senseIndex], product.base);
+      var effect = changes && changes.length ? changes[0] : null;
+      return {
+        base: product.base,
+        observedBase: onStrand,
+        kind: product.kind,
+        note: product.note || "",
+        effect: effect,
+        description: effect ? describeEffect(effect) : null
+      };
+    });
+  }
+
+  /**
+   * The trinucleotide around a target base on the protospacer strand, used for
+   * the sequence-context preferences that transversion editors show.
+   * @returns {string|null} e.g. "CAG", or null when a neighbour falls outside
+   *   the spacer (so the context cannot be read from the guide alone)
+   */
+  function targetContext(spacer, position) {
+    if (position < 2 || position > spacer.length - 1) return null;
+    return spacer.substr(position - 2, 3);
+  }
+
   /* ------------------------------------------------------------------ *
    * Ranking
    * ------------------------------------------------------------------ *
@@ -265,7 +334,9 @@
     gcInRange: 5,
     gcOutOfRange: -6,
     polyT: -15,
-    leadingG: 2
+    leadingG: 2,
+    contextFavorable: 10,
+    contextUnfavorable: -4
   };
 
   function scoreGuide(guide, seq, frame, family) {
@@ -300,6 +371,13 @@
       } else {
         score += WEIGHTS.bystanderInWindow;
       }
+    }
+
+    /* Local sequence context, where the editor has a published preference. */
+    if (ed.favorableContexts && guide.context) {
+      score += ed.favorableContexts.indexOf(guide.context) >= 0
+        ? WEIGHTS.contextFavorable
+        : WEIGHTS.contextUnfavorable;
     }
 
     /* Narrow-window editors buy precision by giving up on-target activity, so
@@ -396,7 +474,7 @@
       if (!ed.id) problems.push(where + ": missing id");
       if (ids[ed.id]) problems.push(where + ": duplicate id");
       ids[ed.id] = true;
-      if (!FAMILY[ed.family]) problems.push(where + ": family must be ABE or CBE");
+      if (!FAMILY[ed.family]) problems.push(where + ": family must be one of " + Object.keys(FAMILY).join(", "));
       if (!ed.pam || !/^[ACGTRYSWKMBDHVN]+$/.test(ed.pam)) problems.push(where + ": invalid pam");
       ["window", "peak"].forEach(function (k) {
         var r = ed[k];
@@ -430,6 +508,8 @@
     findGuides: findGuides,
     applyEdits: applyEdits,
     codonEffects: codonEffects,
+    outcomeSpectrum: outcomeSpectrum,
+    targetContext: targetContext,
     describeEffect: describeEffect,
     scoreGuide: scoreGuide,
     design: design,

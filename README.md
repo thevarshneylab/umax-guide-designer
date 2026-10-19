@@ -1,6 +1,6 @@
 # Umax Guide Designer
 
-sgRNA design for zebrafish base editing with the **ABE-Umax** and **TCBE-Umax** editor families.
+sgRNA design for zebrafish base editing with the **ABE-Umax**, **TCBE-Umax** and **zAYE** editor families — A→G, C→T, and adenine transversions (A→C / A→T).
 
 Pick the base you want to change, and the tool returns every guide that places it inside a published editing window — with bystander edits and codon consequences worked out for each editor in the suite.
 
@@ -48,6 +48,7 @@ Note that **rest2 does not win here**, even though it is the narrowest editor. I
 - **Places the target in each editor's real window**, not a generic 4–8.
 - **Finds bystanders** — every other editable base inside the window — and shows where they fall.
 - **Translates the consequence.** Give it a reading frame and each guide reports the on-target change and every bystander change: silent, missense, or premature stop. Leave the frame unset for splice-site and non-coding work.
+- **Reports the whole product spectrum** for adenine transversion editing, where one edited base resolves into A→C, A→T and residual A→G — each with its own protein consequence.
 - **Ranks candidates** by window fit, PAM quality, bystander burden, reported on-target activity, GC content and poly-T tracts. Two parts of that are worth knowing: a bystander the reading frame shows to be silent is discounted almost to nothing, and the narrow-window editors are discounted by the activity they give up, so they rise to the top only where they actually remove a bystander.
 - **Tiers relaxed PAMs** the way the papers do: NGN > NAN > NYN for ABE-Umax-SpRY, NAN > NYN for TCBE-Umax-SpRY.
 
@@ -61,7 +62,7 @@ Note that **rest2 does not win here**, even though it is the narrowest editor. I
 
 ## Editors covered
 
-All sixteen editors from the two papers. Windows are protospacer positions counted from the PAM-distal end of the 20-nt spacer, with the PAM at positions 21–23.
+All nineteen editors from the three studies. Windows are protospacer positions counted from the PAM-distal end of the 20-nt spacer, with the PAM at positions 21–23.
 
 ### Adenine (A→G) — Qin et al. 2024
 
@@ -92,6 +93,24 @@ ABE-Umax-nanos1 carries the *nanos1* 3′UTR for germline-restricted editing and
 | TCBE-Umax-NG | NGN | 4–10 | 4–8 | NGN sites |
 
 The rest1/rest2/rest3 cytosine editors can produce C-to-G products at TCT motifs — check your chromatograms if the target sits in one.
+
+### Adenine transversion (A→C / A→T) — unpublished
+
+| Editor | PAM | Window | Peak | Notes |
+|---|---|---|---|---|
+| zAYE-1028 | NGG | 6–8 | 7 | First choice. MPGv3 at Cas9 residue 1028 |
+| zAYE-1028-SpG | NGN | 6–8 | 7 | NGN sites; beat SpRY at both NGN targets compared |
+| zAYE-1028-SpRY | NNN | 6–8 | 7 | Last resort; editing seen at NAG, NAA, NTG |
+
+**These parameters are from a manuscript in preparation and may change before publication.** Two things make this family behave unlike the transition editors:
+
+*The window is narrow.* Positions 6–8 only, peaking sharply at 7. Far fewer sites are reachable than with ABE-Umax or TCBE-Umax, so PAM availability is usually the binding constraint — which is why the SpG and SpRY variants matter more here than elsewhere.
+
+*Products are mixed.* Deamination leaves an abasic intermediate, and cellular repair resolves it several ways, so a single edited adenine yields A→C and A→T together, plus residual A→G and some indels. At the two disease variants reported (*myo7aa* Q613P, *cdh23* Q1716P), A→C was predominant at ~31–33%, with ~10% A→T and 10–18% A→G alongside. The tool therefore reports the protein consequence of **all three products** rather than a single outcome — the intended allele is a fraction of the edited alleles, not all of them, so plan genotyping for a mixture.
+
+*Sequence context matters more than for the transition editors.* CAG and CAA contexts (the trinucleotide centred on the target adenine) were the most favourable, and the tool scores guides accordingly and labels the context on each card.
+
+One negative result worth knowing: co-expressing Polη helped in mammalian and maize systems but **did not** help in zebrafish — it left the A→C fraction unchanged and reduced overall efficiency. Not worth trying.
 
 Plasmids are on Addgene: [#222138–222144](https://www.addgene.org/browse/article/28248191/) for the ABE-Umax series.
 
@@ -155,6 +174,10 @@ If this tool was useful, please cite the papers the editor parameters come from:
 > Qin W, Liang F, Lin S-J, et al. ABE-ultramax for high-efficiency biallelic adenine base editing in zebrafish. *Nat Commun*. 2024;15:5613. doi:[10.1038/s41467-024-49943-1](https://doi.org/10.1038/s41467-024-49943-1)
 
 > Qin W, Lin S-J, Zhang Y, et al. High-efficiency TadA cytosine base editors for precise modelling of human disease variants. *Nat Biomed Eng*. 2026. doi:[10.1038/s41551-025-01607-1](https://doi.org/10.1038/s41551-025-01607-1)
+
+The adenine transversion editors are from a manuscript in preparation:
+
+> Qin W, Zhang Y, Huang K, Varshney GK. Adenine transversion base editing expands precise genome engineering in zebrafish. Manuscript in preparation.
 
 Once you have tagged a release and connected [Zenodo](https://zenodo.org/account/settings/github/), add the software DOI here too. See [`CITATION.cff`](CITATION.cff).
 

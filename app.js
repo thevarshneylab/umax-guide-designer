@@ -80,20 +80,43 @@
     var text = "Base " + (state.target + 1) + " is " + base + ". ";
 
     if (!strand) {
-      text += state.family === "ABE"
-        ? "Adenine base editors change A or T — pick an A or a T."
-        : "Cytosine base editors change C or G — pick a C or a G.";
+      text += state.family === "CBE"
+        ? "Cytosine base editors change C or G — pick a C or a G."
+        : "This editor acts on adenine, so pick an A or a T.";
       el.textContent = text;
       return;
     }
 
     var f = UMAX.FAMILY[state.family];
-    var product = strand === "+" ? f.to : UMAX.reverseComplement(f.to);
-    text += base + "→" + product + ", via " +
-      (strand === "+" ? "a sense-strand guide (PAM downstream)" : "an antisense-strand guide (PAM upstream)") + ".";
+    var spectrum = UMAX.outcomeSpectrum(state.seq, state.frame, state.family, strand, state.target);
+    var strandText = strand === "+"
+      ? "a sense-strand guide (PAM downstream)"
+      : "an antisense-strand guide (PAM upstream)";
 
-    var changes = UMAX.codonEffects(state.seq, state.frame, state.family, strand, [state.target]);
-    if (changes && changes.length) text += " On-target consequence: " + UMAX.describeEffect(changes[0]) + ".";
+    if (f.mixedProducts) {
+      var seen = spectrum.map(function (o) { return base + "→" + o.observedBase; }).join(", ");
+      text += "This editor produces a mixture — " + seen + " — via " + strandText + ".";
+      el.textContent = text;
+
+      if (state.frame >= 0) {
+        var list = document.createElement("div");
+        list.className = "spectrum";
+        spectrum.forEach(function (o) {
+          var row = document.createElement("div");
+          row.className = "outcome " + o.kind;
+          row.innerHTML = "<code></code><span class='okind'></span><span></span>";
+          row.querySelector("code").textContent = base + "→" + o.observedBase;
+          row.querySelector(".okind").textContent = o.kind;
+          row.querySelectorAll("span")[1].textContent = o.description || "—";
+          list.appendChild(row);
+        });
+        el.appendChild(list);
+      }
+      return;
+    }
+
+    text += base + "→" + spectrum[0].observedBase + ", via " + strandText + ".";
+    if (spectrum[0].description) text += " On-target consequence: " + spectrum[0].description + ".";
     el.textContent = text;
   }
 
@@ -176,10 +199,21 @@
         ? g.bystanders.map(function (w) { return editedBase + w; }).join(", ")
         : "none in window";
 
+      var fam = UMAX.FAMILY[state.family];
       var consequence = "—";
-      var all = UMAX.codonEffects(state.seq, state.frame, state.family, g.strand,
-        [g.targetIndex].concat(g.bystanderIndices));
-      if (all && all.length) consequence = all.map(UMAX.describeEffect).join("; ");
+      if (fam.mixedProducts) {
+        /* With mixed products the intended change is only one of several
+           outcomes, so the target's own spectrum is what matters; bystander
+           consequences are listed separately below. */
+        var spec = UMAX.outcomeSpectrum(state.seq, state.frame, state.family, g.strand, g.targetIndex);
+        consequence = spec.map(function (o) {
+          return o.base + ": " + (o.description || "—");
+        }).join("  ·  ");
+      } else {
+        var all = UMAX.codonEffects(state.seq, state.frame, state.family, g.strand,
+          [g.targetIndex].concat(g.bystanderIndices));
+        if (all && all.length) consequence = all.map(UMAX.describeEffect).join("; ");
+      }
 
       card.innerHTML =
         '<div class="ghead"><span class="ename"></span>' +
@@ -197,11 +231,20 @@
           '<div><span>Window</span>' + ed.window[0] + '–' + ed.window[1] + ' (peak ' + ed.peak[0] + '–' + ed.peak[1] + ')</div>' +
           '<div><span>Bystanders</span>' + bystanderText + '</div>' +
           '<div><span>GC</span>' + g.gc.toFixed(0) + '%</div>' +
+          (g.contextFavorable === null ? '' :
+            '<div><span>Context</span>' + (g.context || "—") +
+            (g.contextFavorable ? ' · favorable' : ' · not preferred') + '</div>') +
           '<div style="grid-column:1/-1"><span>Protein</span><span class="cons"></span></div>' +
         '</div>' +
         '<p class="note"></p>';
 
       card.querySelector(".ename").textContent = ed.id;
+      if (ed.unpublished) {
+        var badge = document.createElement("span");
+        badge.className = "unpub";
+        badge.textContent = " unpublished";
+        card.querySelector(".ename").appendChild(badge);
+      }
       card.querySelector(".cons").textContent = consequence;
       card.querySelector(".cons").style.cssText = "display:inline;font-size:13px;letter-spacing:0;text-transform:none;font-weight:400;color:inherit";
 
@@ -235,7 +278,14 @@
       ].forEach(function (value, i) {
         var td = document.createElement("td");
         if (i >= 1 && i <= 4) td.className = "num";
-        if (i === 0) { var s = document.createElement("strong"); s.textContent = value; td.appendChild(s); }
+        if (i === 0) {
+          var s = document.createElement("strong"); s.textContent = value; td.appendChild(s);
+          if (ed.unpublished) {
+            var u = document.createElement("span");
+            u.className = "unpub"; u.textContent = " unpublished";
+            td.appendChild(u);
+          }
+        }
         else td.textContent = value;
         tr.appendChild(td);
       });
@@ -289,7 +339,11 @@
       if (cleaned !== state.seq) { state.seq = cleaned; state.target = -1; render(); }
     });
 
-    $("edit").addEventListener("change", function () { state.family = this.value; render(); });
+    $("edit").addEventListener("change", function () {
+      state.family = this.value;
+      $("ayenotice").hidden = !UMAX.FAMILY[state.family].mixedProducts;
+      render();
+    });
     $("frame").addEventListener("change", function () { state.frame = parseInt(this.value, 10); render(); });
     $("filter").addEventListener("change", function () { state.filter = this.value; renderResults(); });
 
@@ -321,6 +375,7 @@
     state.family = "CBE";
     state.frame = 0;
     state.target = EXAMPLE_TARGET;
+    $("ayenotice").hidden = !UMAX.FAMILY[state.family].mixedProducts;
     render();
   }
 

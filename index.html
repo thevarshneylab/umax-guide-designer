@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Umax Guide Designer — sgRNA design for zebrafish ABE-Umax and TCBE-Umax</title>
-<meta name="description" content="Design sgRNAs for zebrafish base editing with the ABE-Umax and TCBE-Umax editor families. Places the target base in each editor's published editing window and reports bystanders and codon consequences.">
+<title>Umax Guide Designer — sgRNA design for zebrafish base editing</title>
+<meta name="description" content="Design sgRNAs for zebrafish base editing with the ABE-Umax, TCBE-Umax and zAYE editor families — A-to-G, C-to-T and adenine transversions. Places the target base in each editor's editing window and reports bystanders, product spectrum and codon consequences.">
 <meta name="author" content="Gaurav K. Varshney">
 <link rel="canonical" href="https://thevarshneylab.github.io/umax-guide-designer/">
 <meta property="og:title" content="Umax Guide Designer">
@@ -112,6 +112,25 @@ td.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-spac
 details summary{cursor:pointer;font-weight:600;font-size:14px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:13px;font-weight:600;z-index:20}
 .error{border-color:var(--target);color:var(--target)}
+.notice{
+  margin-top:14px;border:1px solid var(--bystander);border-radius:8px;
+  padding:14px 16px;font-size:13px;background:transparent;
+}
+.notice strong{color:var(--bystander)}
+.notice p{margin:7px 0 0;color:var(--muted)}
+.notice ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
+.notice li{margin-top:5px}
+.notice li strong{color:var(--ink)}
+.spectrum{display:flex;flex-direction:column;gap:5px;margin-top:2px}
+.outcome{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;font-size:13px}
+.outcome code{
+  font-family:var(--font-mono);font-weight:600;font-size:12.5px;
+  border:1px solid var(--line);border-radius:4px;padding:1px 6px;
+}
+.outcome.intended code{border-color:var(--accent);color:var(--accent)}
+.outcome.byproduct code{border-color:var(--bystander);color:var(--bystander)}
+.outcome .okind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.unpub{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--bystander);font-weight:700}
 a{color:var(--accent)}
 @media (max-width:520px){.field.grow{width:100%}}
 </style>
@@ -141,6 +160,7 @@ a{color:var(--accent)}
       <select id="edit">
         <option value="ABE">A→G / T→C (ABE-Umax)</option>
         <option value="CBE">C→T / G→A (TCBE-Umax)</option>
+        <option value="AYE">A→C or A→T / T→G or T→A (zAYE)</option>
       </select>
     </div>
     <div class="field">
@@ -159,6 +179,15 @@ a{color:var(--accent)}
     <button id="example" class="ghost" type="button">Load example</button>
   </div>
   <p class="hint" style="margin:12px 0 0">Editing happens on the protospacer strand, so the tool picks the guide strand for you: an A or C you click is edited by a sense-strand guide, a T or G by an antisense guide.</p>
+
+  <div id="ayenotice" class="notice" hidden>
+    <strong>Adenine transversion editing is unpublished.</strong>
+    <p>The zAYE parameters here come from a manuscript in preparation (Qin, Zhang, Huang &amp; Varshney) and may change before publication. Two features make these editors behave unlike the transition editors above:</p>
+    <ul>
+      <li><strong>The window is narrow</strong> — positions 6–8 only, peaking at 7. Far fewer sites are reachable, so PAM availability is the main constraint.</li>
+      <li><strong>Products are mixed.</strong> Deamination leaves an abasic intermediate that cellular repair resolves several ways, so one edited base yields A→C and A→T together, plus residual A→G and some indels. At the two disease variants reported, A→C was predominant at about 31–33%, with roughly 10% A→T and 10–18% A→G alongside it. Plan genotyping accordingly: the intended allele is a fraction of the edited alleles, not all of them.</li>
+    </ul>
+  </div>
 </section>
 
 <section class="panel">
@@ -194,6 +223,7 @@ a{color:var(--accent)}
     </div>
     <p class="hint" style="margin-top:14px">
       Windows are counted from the PAM-distal end of the 20-nt protospacer, with the PAM at positions 21–23.
+      Editors marked unpublished come from a manuscript in preparation and may change.
       ABE-Umax-nanos1 carries the <em>nanos1</em> 3′UTR for germline-restricted editing and shares ABE-Umax's window and PAM; pick it when biallelic F0 editing would be lethal.
       Parameters live in <a href="editors.json">editors.json</a>.
     </p>
@@ -207,7 +237,7 @@ a{color:var(--accent)}
       This page does not search the genome — that needs the GRCz11 reference and an index. Copy a spacer and run it through
       <a href="https://crispor.gi.ucsc.edu/" target="_blank" rel="noopener">CRISPOR</a> or
       <a href="http://www.rgenome.net/cas-offinder/" target="_blank" rel="noopener">Cas-OFFinder</a> against <em>Danio rerio</em> GRCz11/danRer11,
-      which is what both Umax papers used (up to four mismatches, then amplicon sequencing of the top three sites).
+      which is what all three Umax studies used (up to four mismatches, then amplicon sequencing of the top-ranked sites).
       Efficiency predictions from BE-Hive or DeepBE are also out of scope: those are trained models, and neither was trained on zebrafish embryos.
     </p>
   </details>

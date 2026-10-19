@@ -280,6 +280,122 @@ equal("no PAM means no guides",
   UMAX.findGuides("A".repeat(60), 30, "ABE", EDITORS.filter(e => e.pam === "NGG")).length, 0);
 
 /* ------------------------------------------------------------------ *
+ * Adenine transversion editing (zAYE, unpublished)
+ *
+ * Unlike the transition editors, one edited adenine resolves into several
+ * products, so the tool must report the whole spectrum rather than a single
+ * consequence. Window is 6-8 with peak activity at 7.
+ * ------------------------------------------------------------------ */
+
+const AYE_WINDOWS = {
+  "zAYE-1028": [6, 8], "zAYE-1028-SpG": [6, 8], "zAYE-1028-SpRY": [6, 8]
+};
+Object.keys(AYE_WINDOWS).forEach(id => {
+  const ed = EDITORS.find(e => e.id === id);
+  check(id + " is present", !!ed);
+  if (ed) {
+    equal(id + " window matches the manuscript", ed.window, AYE_WINDOWS[id]);
+    equal(id + " peaks at position 7", ed.peak, [7, 7]);
+    equal(id + " is flagged unpublished", ed.unpublished, true);
+    equal(id + " prefers CAG and CAA", ed.favorableContexts, ["CAG", "CAA"]);
+  }
+});
+
+equal("AYE acts on adenine via a sense guide", UMAX.guideStrandFor("A", "AYE"), "+");
+equal("AYE acts on a sense-strand T via an antisense guide", UMAX.guideStrandFor("T", "AYE"), "-");
+equal("AYE cannot edit C", UMAX.guideStrandFor("C", "AYE"), null);
+equal("AYE is declared as producing mixed products", UMAX.FAMILY.AYE.mixedProducts, true);
+equal("the transition families are not", UMAX.FAMILY.ABE.mixedProducts, false);
+
+/* The spectrum: three products, correctly ordered and classified. */
+const aIdx = EXAMPLE.indexOf("A", 15);
+const spectrum = UMAX.outcomeSpectrum(EXAMPLE, FRAME, "AYE", "+", aIdx);
+equal("three products are reported", spectrum.length, 3);
+equal("the intended product is C", spectrum[0].base, "C");
+equal("and is classified as intended", spectrum[0].kind, "intended");
+equal("A-to-T is the alternate product", spectrum[1].base, "T");
+equal("residual A-to-G is flagged as a byproduct", spectrum[2].kind, "byproduct");
+equal("A-to-G is the byproduct base", spectrum[2].base, "G");
+check("each product carries a protein consequence",
+  spectrum.every(o => typeof o.description === "string" && o.description.length > 0));
+check("the three products give different consequences here",
+  new Set(spectrum.map(o => o.description)).size === 3);
+
+/* A transition editor still reports exactly one outcome. */
+equal("CBE reports a single product",
+  UMAX.outcomeSpectrum(EXAMPLE, FRAME, "CBE", "+", TARGET).length, 1);
+
+/* On an antisense guide the products are complemented onto the sense strand:
+   an A-to-C edit on the protospacer reads as T-to-G on the pasted sequence. */
+const tIdx = EXAMPLE.indexOf("T", 20);
+const antiSpec = UMAX.outcomeSpectrum(EXAMPLE, FRAME, "AYE", "-", tIdx);
+equal("antisense intended product is read as G on the sense strand",
+  antiSpec[0].observedBase, "G");
+equal("antisense alternate reads as A", antiSpec[1].observedBase, "A");
+equal("antisense byproduct reads as C", antiSpec[2].observedBase, "C");
+equal("the protospacer-strand base is still C for the intended product",
+  antiSpec[0].base, "C");
+
+/* applyEdits must honour the requested product rather than always the default. */
+equal("applyEdits installs the alternate product when asked",
+  UMAX.applyEdits("GGAGG", "AYE", "+", [2], "T"), "GGTGG");
+equal("applyEdits defaults to the intended product",
+  UMAX.applyEdits("GGAGG", "AYE", "+", [2]), "GGCGG");
+equal("applyEdits complements the product on an antisense guide",
+  UMAX.applyEdits("GGTGG", "AYE", "-", [2], "C"), "GGGGG");
+
+/* Sequence context is read as the trinucleotide centred on the target. */
+equal("targetContext reads the trinucleotide", UMAX.targetContext("GGCAGTTTTTTTTTTTTTTT", 4), "CAG");
+equal("targetContext is null at the spacer's first position",
+  UMAX.targetContext("ACGTACGTACGTACGTACGT", 1), null);
+
+/* Context preference must actually move the ranking: the same guide geometry
+   in a CAG context should outrank one in a context the editor dislikes. */
+(() => {
+  const pre = "GGGGG";                      // positions 1-5
+  const tail = "TTTTTTTTTTTT";              // pad to 20 nt
+  const favSpacer  = (pre + "CAG" + tail).slice(0, 20);   // A at position 7, CAG
+  const plainSpacer = (pre + "GAG" + tail).slice(0, 20);  // A at position 7, GAG
+  const fav = UMAX.design(favSpacer + "AGG" + "TTTTT", 6, "AYE", EDITORS, -1);
+  const plain = UMAX.design(plainSpacer + "AGG" + "TTTTT", 6, "AYE", EDITORS, -1);
+  check("a CAG context is detected", fav.length > 0 && fav[0].context === "CAG");
+  check("and marked favorable", fav.length > 0 && fav[0].contextFavorable === true);
+  check("a non-preferred context is marked as such",
+    plain.length > 0 && plain[0].contextFavorable === false);
+  check("the favorable context scores higher",
+    fav.length > 0 && plain.length > 0 && fav[0].score > plain[0].score,
+    "CAG " + (fav[0] || {}).score + " vs GAG " + (plain[0] || {}).score);
+})();
+
+/* Context is only scored for editors that declare a preference. */
+const cbeGuide = UMAX.design(EXAMPLE, TARGET, "CBE", EDITORS, FRAME)[0];
+equal("transition editors report no context verdict", cbeGuide.contextFavorable, null);
+
+/* The narrow 6-8 window must be enforced exactly. */
+EDITORS.filter(e => e.family === "AYE" && e.pam === "NGG").forEach(ed => {
+  for (let pos = 1; pos <= UMAX.SPACER_LENGTH; pos++) {
+    const spacer = Array.from({ length: UMAX.SPACER_LENGTH },
+      (_, i) => (i === pos - 1 ? "A" : "C")).join("");
+    const seq = "C".repeat(20) + spacer + "AGG" + "C".repeat(20);
+    const found = UMAX.findGuides(seq, 20 + pos - 1, "AYE", [ed]);
+    const expected = pos >= 6 && pos <= 8;
+    check(ed.id + " position " + pos + (expected ? " is designable" : " is correctly rejected"),
+      (found.length > 0) === expected);
+  }
+});
+
+/* Antisense A-to-Y must work, same as the transition families. */
+(() => {
+  const editable = [];
+  for (let i = 0; i < EXAMPLE.length; i++) {
+    if (UMAX.guideStrandFor(EXAMPLE.charAt(i), "AYE") === "-") editable.push(i);
+  }
+  const withGuides = editable.filter(i => UMAX.design(EXAMPLE, i, "AYE", EDITORS, FRAME).length > 0);
+  check("AYE designs antisense guides", withGuides.length > 0,
+    withGuides.length + " of " + editable.length + " antisense bases yielded guides");
+})();
+
+/* ------------------------------------------------------------------ *
  * Report
  * ------------------------------------------------------------------ */
 

@@ -10,6 +10,13 @@
       "key": "qin2026",
       "citation": "Qin W, Lin S-J, Zhang Y, et al. High-efficiency TadA cytosine base editors for precise modelling of human disease variants. Nat Biomed Eng. 2026.",
       "doi": "10.1038/s41551-025-01607-1"
+    },
+    {
+      "key": "qin2026aye",
+      "citation": "Qin W, Zhang Y, Huang K, Varshney GK. Adenine transversion base editing expands precise genome engineering in zebrafish. Manuscript in preparation.",
+      "doi": "",
+      "status": "unpublished",
+      "note": "Parameters below are taken from the manuscript and may change before publication."
     }
   ],
   "editors": [
@@ -18,8 +25,14 @@
       "family": "ABE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [3, 9],
-      "peak": [4, 8],
+      "window": [
+        3,
+        9
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "source": "qin2024",
       "use": "First choice at NGG sites. Highest efficiency, low indels."
@@ -29,8 +42,14 @@
       "family": "ABE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [4, 12],
-      "peak": [4, 8],
+      "window": [
+        4,
+        12
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "source": "qin2024",
       "use": "Target adenine sits past position 9 but before 12."
@@ -40,8 +59,14 @@
       "family": "ABE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [8, 16],
-      "peak": [12, 15],
+      "window": [
+        8,
+        16
+      ],
+      "peak": [
+        12,
+        15
+      ],
       "precise": false,
       "source": "qin2024",
       "use": "PAM-proximal adenines. Used for the cdh23 splice donor at position 12."
@@ -52,8 +77,14 @@
       "family": "ABE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [5, 6],
-      "peak": [5, 6],
+      "window": [
+        5,
+        6
+      ],
+      "peak": [
+        5,
+        6
+      ],
       "precise": true,
       "source": "qin2024",
       "use": "Bystander adenines must be avoided. Retains ~55% of ABE-Umax activity."
@@ -64,8 +95,14 @@
       "family": "ABE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [4, 6],
-      "peak": [4, 6],
+      "window": [
+        4,
+        6
+      ],
+      "peak": [
+        4,
+        6
+      ],
       "precise": true,
       "source": "qin2024",
       "use": "Narrow window shifted one base earlier than rest1."
@@ -76,8 +113,14 @@
       "family": "ABE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [12, 15],
-      "peak": [12, 15],
+      "window": [
+        12,
+        15
+      ],
+      "peak": [
+        12,
+        15
+      ],
       "precise": true,
       "source": "qin2024",
       "use": "Precise editing deep in the PAM-proximal half."
@@ -87,21 +130,36 @@
       "family": "ABE",
       "cas": "SpRY",
       "pam": "NNN",
-      "window": [3, 9],
-      "peak": [4, 8],
+      "window": [
+        3,
+        9
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "source": "qin2024",
-      "pamPreference": ["NGN", "NAN", "NYN"],
+      "pamPreference": [
+        "NGN",
+        "NAN",
+        "NYN"
+      ],
       "use": "No GG motif available. PAM preference NGN > NAN > NYN; test several guides."
     },
-
     {
       "id": "TCBE-Umax",
       "family": "CBE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [4, 10],
-      "peak": [4, 8],
+      "window": [
+        4,
+        10
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "source": "qin2026",
       "use": "First choice at NGG sites. Up to 89% editing, no sequence-context bias."
@@ -111,8 +169,14 @@
       "family": "CBE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [3, 12],
-      "peak": [4, 10],
+      "window": [
+        3,
+        12
+      ],
+      "peak": [
+        4,
+        10
+      ],
       "precise": false,
       "source": "qin2026",
       "use": "Top pick when indels are a worry: roughly a quarter of TCBE-Umax indel levels."
@@ -122,8 +186,14 @@
       "family": "CBE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [4, 16],
-      "peak": [13, 15],
+      "window": [
+        4,
+        16
+      ],
+      "peak": [
+        13,
+        15
+      ],
       "precise": false,
       "source": "qin2026",
       "use": "PAM-proximal cytosines, peak activity at 13-15."
@@ -133,8 +203,14 @@
       "family": "CBE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [4, 10],
-      "peak": [4, 8],
+      "window": [
+        4,
+        10
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "penalty": 6,
       "source": "qin2026",
@@ -146,8 +222,14 @@
       "family": "CBE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [5, 7],
-      "peak": [5, 7],
+      "window": [
+        5,
+        7
+      ],
+      "peak": [
+        5,
+        7
+      ],
       "precise": true,
       "source": "qin2026",
       "use": "Avoids editing at C4. Retains ~44% activity. Can give C-to-G products at TCT motifs."
@@ -158,8 +240,14 @@
       "family": "CBE",
       "cas": "SpCas9",
       "pam": "NGG",
-      "window": [4, 7],
-      "peak": [4, 7],
+      "window": [
+        4,
+        7
+      ],
+      "peak": [
+        4,
+        7
+      ],
       "precise": true,
       "source": "qin2026",
       "use": "Best precision editor overall: ~75% of TCBE-Umax activity, lowest bystander editing. Can give C-to-G products at TCT motifs."
@@ -169,11 +257,20 @@
       "family": "CBE",
       "cas": "SpRY",
       "pam": "NNN",
-      "window": [4, 10],
-      "peak": [4, 8],
+      "window": [
+        4,
+        10
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "source": "qin2026",
-      "pamPreference": ["NAN", "NYN"],
+      "pamPreference": [
+        "NAN",
+        "NYN"
+      ],
       "use": "No G in the PAM. PAM preference NAN > NYN."
     },
     {
@@ -181,8 +278,14 @@
       "family": "CBE",
       "cas": "SpG",
       "pam": "NGN",
-      "window": [4, 10],
-      "peak": [4, 8],
+      "window": [
+        4,
+        10
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "source": "qin2026",
       "use": "NGN sites. Outperformed SpRY at the kras R26C NGA locus."
@@ -192,11 +295,83 @@
       "family": "CBE",
       "cas": "Cas9-NG",
       "pam": "NGN",
-      "window": [4, 10],
-      "peak": [4, 8],
+      "window": [
+        4,
+        10
+      ],
+      "peak": [
+        4,
+        8
+      ],
       "precise": false,
       "source": "qin2026",
       "use": "NGN sites. Outperformed SpRY at the kras E484K NGT locus."
+    },
+    {
+      "id": "zAYE-1028",
+      "family": "AYE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [
+        6,
+        8
+      ],
+      "peak": [
+        7,
+        7
+      ],
+      "precise": false,
+      "source": "qin2026aye",
+      "unpublished": true,
+      "favorableContexts": [
+        "CAG",
+        "CAA"
+      ],
+      "use": "First choice at NGG sites. MPGv3 repositioned to Cas9 residue 1028. Reached 37.6% A-to-C and 20.6% A-to-T at the most active adenines."
+    },
+    {
+      "id": "zAYE-1028-SpG",
+      "family": "AYE",
+      "cas": "SpG",
+      "pam": "NGN",
+      "window": [
+        6,
+        8
+      ],
+      "peak": [
+        7,
+        7
+      ],
+      "precise": false,
+      "source": "qin2026aye",
+      "unpublished": true,
+      "favorableContexts": [
+        "CAG",
+        "CAA"
+      ],
+      "use": "NGN sites. Outperformed the SpRY variant at both NGN targets tested head-to-head, though only two sites were compared."
+    },
+    {
+      "id": "zAYE-1028-SpRY",
+      "family": "AYE",
+      "cas": "SpRY",
+      "pam": "NNN",
+      "window": [
+        6,
+        8
+      ],
+      "peak": [
+        7,
+        7
+      ],
+      "precise": false,
+      "source": "qin2026aye",
+      "unpublished": true,
+      "favorableContexts": [
+        "CAG",
+        "CAA"
+      ],
+      "use": "Last resort when no G is available in the PAM. Supported editing at NAG, NAA and NTG targets. Few sites tested, so treat any PAM ranking as provisional."
     }
   ]
 }
