@@ -138,11 +138,11 @@
       }
 
       var lines = [];
-      var strandName = flank.strand === "+" ? "sense" : "antisense";
 
       if (flank.shortOnPamSide) {
         /* The usual cause: not enough sequence on the side the PAM sits. */
-        lines.push("A " + strandName + "-strand guide is needed here, so its PAM sits <strong>" +
+        lines.push((flank.strand === "+" ? "A sense" : "An antisense") +
+          "-strand guide is needed here, so its PAM sits <strong>" +
           flank.pamSide + "</strong> of this base — and only " +
           (flank.pamSide === "upstream" ? flank.upstream : flank.downstream) +
           " nt of sequence is pasted on that side.");
@@ -150,7 +150,7 @@
           " of the target. Around 30 nt of flanking sequence on both sides covers every editor in the suite.");
       } else {
         lines.push("No PAM in this region puts the base inside a " + state.family +
-          "-Umax window on the " + strandName + " strand.");
+          "-Umax window on the " + (flank.strand === "+" ? "sense" : "antisense") + " strand.");
         lines.push("Options: try the other editor family if the change allows it, target a different " +
           "base in the same codon, or extend the sequence " + flank.pamSide +
           " in case a usable PAM lies just outside what is pasted.");
