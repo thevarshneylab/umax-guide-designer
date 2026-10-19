@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Umax Guide Designer — sgRNA design for zebrafish ABE-Umax and TCBE-Umax</title>
+<meta name="description" content="Design sgRNAs for zebrafish base editing with the ABE-Umax and TCBE-Umax editor families. Places the target base in each editor's published editing window and reports bystanders and codon consequences.">
+<meta name="author" content="Gaurav K. Varshney">
+<link rel="canonical" href="https://thevarshneylab.github.io/umax-guide-designer/">
+<meta property="og:title" content="Umax Guide Designer">
+<meta property="og:description" content="sgRNA design for zebrafish ABE-Umax and TCBE-Umax base editors.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#129516;</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: single column — input panel, sequence track, ranked guide list, reference table */
+:root{
+  --bg:#f5f4f0;
+  --panel:#ffffff;
+  --ink:#1c1e22;
+  --muted:#60656e;
+  --line:#ddd9d1;
+  --accent:#0f6f68;        /* guides, primary actions */
+  --target:#c2521a;        /* the base being edited */
+  --bystander:#8a6d1f;     /* unintended edits */
+  --peak:#d8efe9;          /* peak window wash */
+  --win:#eef1ef;           /* full window wash */
+  --font-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171a; --panel:#1d2024; --ink:#e9e7e2; --muted:#9aa1ab; --line:#32363c;
+    --accent:#58c8bd; --target:#f08a52; --bystander:#d6b85a;
+    --peak:#15393a; --win:#24282d; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --panel:#1d2024; --ink:#e9e7e2; --muted:#9aa1ab; --line:#32363c;
+  --accent:#58c8bd; --target:#f08a52; --bystander:#d6b85a;
+  --peak:#15393a; --win:#24282d; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+img{max-width:100%}
+[hidden]{display:none !important}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--font-ui);
+  font-size:15px; line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:28px 56px;
+}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:26px}
+h1{font-size:clamp(24px,4vw,32px);font-weight:600;letter-spacing:-.02em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0;max-width:62ch}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+label{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+textarea,select,input[type=text]{
+  font-family:var(--font-mono);font-size:13px;color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:7px;padding:9px 10px;width:100%;
+}
+textarea{min-height:104px;resize:vertical;line-height:1.6;letter-spacing:.04em}
+select{font-family:var(--font-ui);min-width:150px}
+button{
+  font-family:var(--font-ui);font-size:13px;font-weight:600;cursor:pointer;
+  background:var(--accent);color:var(--panel);border:none;border-radius:7px;padding:9px 14px;
+}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible,.base:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{font-size:12.5px;color:var(--muted)}
+.track{overflow-x:auto;padding-bottom:4px}
+.seqline{display:flex;align-items:baseline;gap:10px;font-family:var(--font-mono);font-size:14px}
+.coord{color:var(--muted);font-size:11px;min-width:5ch;text-align:right;flex:none;font-variant-numeric:tabular-nums}
+.bases{display:flex}
+.base{
+  width:1.15ch;text-align:center;cursor:pointer;border:none;background:none;padding:1px 0;
+  font-family:var(--font-mono);font-size:14px;color:var(--ink);border-radius:2px;
+}
+.base.sep{margin-right:.55ch}
+.base.inwin{background:var(--win)}
+.base.inpeak{background:var(--peak)}
+.base.istarget{background:var(--target);color:#fff;font-weight:600}
+.base.isbys{color:var(--bystander);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.base.codonalt{opacity:.62}
+.guide{border:1px solid var(--line);border-radius:9px;padding:14px;background:var(--panel);display:flex;flex-direction:column;gap:9px}
+.guide.top{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.ghead{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between}
+.ename{font-weight:600;font-size:15px}
+.pill{font-size:11px;font-weight:600;padding:2px 7px;border-radius:99px;border:1px solid var(--line);color:var(--muted);letter-spacing:.02em}
+.pill.good{color:var(--accent);border-color:var(--accent)}
+.pill.warn{color:var(--bystander);border-color:var(--bystander)}
+.spacer{font-family:var(--font-mono);font-size:14px;letter-spacing:.06em;word-break:break-all}
+.spacer .pam{color:var(--muted)}
+.spacer mark{background:var(--target);color:#fff;border-radius:2px;padding:0 1px}
+.spacer .b{color:var(--bystander);font-weight:600}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 16px;font-size:13px}
+.meta div span{color:var(--muted);display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.note{font-size:12.5px;color:var(--muted);border-left:2px solid var(--line);padding-left:9px;margin:0}
+.empty{padding:22px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:9px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+td.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tablewrap{overflow-x:auto}
+details summary{cursor:pointer;font-weight:600;font-size:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:13px;font-weight:600;z-index:20}
+.error{border-color:var(--target);color:var(--target)}
+a{color:var(--accent)}
+@media (max-width:520px){.field.grow{width:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Zebrafish base editing · ABE-Umax &amp; TCBE-Umax</p>
+  <h1>Umax Guide Designer</h1>
+  <p class="sub">Paste a target region, click the base you want to change, and get every sgRNA that places it inside a published Umax editing window — with bystanders and codon consequences worked out.</p>
+</header>
+
+<div id="loaderror" class="panel error" hidden>
+  <strong>Could not load editors.json.</strong>
+  <p class="hint" style="margin:6px 0 0">Browsers block file reads from <code>file://</code> pages. Serve the folder over HTTP instead — <code>python3 -m http.server</code> in this directory, then open <code>http://localhost:8000</code>.</p>
+</div>
+
+<section class="panel">
+  <div class="field grow">
+    <label for="seq">Target sequence (sense strand, 5′→3′). FASTA headers, numbers and spaces are ignored.</label>
+    <textarea id="seq" spellcheck="false"></textarea>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <div class="field">
+      <label for="edit">Edit to make</label>
+      <select id="edit">
+        <option value="ABE">A→G / T→C (ABE-Umax)</option>
+        <option value="CBE">C→T / G→A (TCBE-Umax)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="frame">Reading frame</label>
+      <select id="frame">
+        <option value="-1">Not coding / unknown</option>
+        <option value="0">Codon 1 starts at base 1</option>
+        <option value="1">Codon 1 starts at base 2</option>
+        <option value="2">Codon 1 starts at base 3</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="pos">Jump to base</label>
+      <input type="text" id="pos" inputmode="numeric" placeholder="e.g. 19" style="width:120px">
+    </div>
+    <button id="example" class="ghost" type="button">Load example</button>
+  </div>
+  <p class="hint" style="margin:12px 0 0">Editing happens on the protospacer strand, so the tool picks the guide strand for you: an A or C you click is edited by a sense-strand guide, a T or G by an antisense guide.</p>
+</section>
+
+<section class="panel">
+  <p class="eyebrow" style="margin:0 0 10px">Sequence · click a base to target it</p>
+  <div class="track" id="track"></div>
+  <p id="targetline" class="hint" style="margin:14px 0 0"></p>
+</section>
+
+<section>
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
+    <p class="eyebrow" style="margin:0">Guides <span id="count"></span></p>
+    <div class="row" style="gap:8px">
+      <select id="filter" aria-label="Filter editors">
+        <option value="all">All editors</option>
+        <option value="ngg">NGG PAM only</option>
+        <option value="precise">Precision editors only</option>
+        <option value="nobys">No bystanders in window</option>
+      </select>
+      <button id="copy" class="ghost" type="button">Copy table</button>
+    </div>
+  </div>
+  <div id="results" style="display:flex;flex-direction:column;gap:12px"></div>
+</section>
+
+<section class="panel">
+  <details>
+    <summary>Editor reference</summary>
+    <div class="tablewrap" style="margin-top:12px">
+      <table id="reftable">
+        <thead><tr><th>Editor</th><th>Edit</th><th>PAM</th><th class="num">Window</th><th class="num">Peak</th><th>Use it when</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint" style="margin-top:14px">
+      Windows are counted from the PAM-distal end of the 20-nt protospacer, with the PAM at positions 21–23.
+      ABE-Umax-nanos1 carries the <em>nanos1</em> 3′UTR for germline-restricted editing and shares ABE-Umax's window and PAM; pick it when biallelic F0 editing would be lethal.
+      Parameters live in <a href="editors.json">editors.json</a>.
+    </p>
+  </details>
+</section>
+
+<section class="panel">
+  <details>
+    <summary>Off-target checking</summary>
+    <p class="hint" style="margin:10px 0 0">
+      This page does not search the genome — that needs the GRCz11 reference and an index. Copy a spacer and run it through
+      <a href="https://crispor.gi.ucsc.edu/" target="_blank" rel="noopener">CRISPOR</a> or
+      <a href="http://www.rgenome.net/cas-offinder/" target="_blank" rel="noopener">Cas-OFFinder</a> against <em>Danio rerio</em> GRCz11/danRer11,
+      which is what both Umax papers used (up to four mismatches, then amplicon sequencing of the top three sites).
+      Efficiency predictions from BE-Hive or DeepBE are also out of scope: those are trained models, and neither was trained on zebrafish embryos.
+    </p>
+  </details>
+</section>
+
+<footer class="hint">
+  <p>Window placement and PAM rules come from the published selection strategies. Ranking is a heuristic for triaging guides, not a trained efficiency prediction — the papers are clear that locus behaviour varies and several candidates are worth testing in parallel.</p>
+  <p id="citations"></p>
+  <p>Open source · <a href="https://github.com/thevarshneylab/umax-guide-designer">source and issues on GitHub</a></p>
+</footer>
+
+</div>
+
+<script src="umax.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

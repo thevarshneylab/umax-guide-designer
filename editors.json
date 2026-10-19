@@ -1,0 +1,202 @@
+{
+  "$comment": "Editing windows are protospacer positions counted from the PAM-distal end of the 20-nt spacer, with the PAM at positions 21-23. To add an editor, copy a block and edit it; no code changes are needed. Run `node test.js` afterwards to check the file is still valid.",
+  "sources": [
+    {
+      "key": "qin2024",
+      "citation": "Qin W, Liang F, Lin S-J, et al. ABE-ultramax for high-efficiency biallelic adenine base editing in zebrafish. Nat Commun. 2024;15:5613.",
+      "doi": "10.1038/s41467-024-49943-1"
+    },
+    {
+      "key": "qin2026",
+      "citation": "Qin W, Lin S-J, Zhang Y, et al. High-efficiency TadA cytosine base editors for precise modelling of human disease variants. Nat Biomed Eng. 2026.",
+      "doi": "10.1038/s41551-025-01607-1"
+    }
+  ],
+  "editors": [
+    {
+      "id": "ABE-Umax",
+      "family": "ABE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [3, 9],
+      "peak": [4, 8],
+      "precise": false,
+      "source": "qin2024",
+      "use": "First choice at NGG sites. Highest efficiency, low indels."
+    },
+    {
+      "id": "ABE-Umax-ex1",
+      "family": "ABE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [4, 12],
+      "peak": [4, 8],
+      "precise": false,
+      "source": "qin2024",
+      "use": "Target adenine sits past position 9 but before 12."
+    },
+    {
+      "id": "ABE-Umax-ex2",
+      "family": "ABE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [8, 16],
+      "peak": [12, 15],
+      "precise": false,
+      "source": "qin2024",
+      "use": "PAM-proximal adenines. Used for the cdh23 splice donor at position 12."
+    },
+    {
+      "id": "ABE-Umax-rest1",
+      "activity": 0.55,
+      "family": "ABE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [5, 6],
+      "peak": [5, 6],
+      "precise": true,
+      "source": "qin2024",
+      "use": "Bystander adenines must be avoided. Retains ~55% of ABE-Umax activity."
+    },
+    {
+      "id": "ABE-Umax-ex1-rest1",
+      "activity": 0.55,
+      "family": "ABE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [4, 6],
+      "peak": [4, 6],
+      "precise": true,
+      "source": "qin2024",
+      "use": "Narrow window shifted one base earlier than rest1."
+    },
+    {
+      "id": "ABE-Umax-ex2-rest1",
+      "activity": 0.55,
+      "family": "ABE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [12, 15],
+      "peak": [12, 15],
+      "precise": true,
+      "source": "qin2024",
+      "use": "Precise editing deep in the PAM-proximal half."
+    },
+    {
+      "id": "ABE-Umax-SpRY",
+      "family": "ABE",
+      "cas": "SpRY",
+      "pam": "NNN",
+      "window": [3, 9],
+      "peak": [4, 8],
+      "precise": false,
+      "source": "qin2024",
+      "pamPreference": ["NGN", "NAN", "NYN"],
+      "use": "No GG motif available. PAM preference NGN > NAN > NYN; test several guides."
+    },
+
+    {
+      "id": "TCBE-Umax",
+      "family": "CBE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [4, 10],
+      "peak": [4, 8],
+      "precise": false,
+      "source": "qin2026",
+      "use": "First choice at NGG sites. Up to 89% editing, no sequence-context bias."
+    },
+    {
+      "id": "TCBE-Umax-ex1",
+      "family": "CBE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [3, 12],
+      "peak": [4, 10],
+      "precise": false,
+      "source": "qin2026",
+      "use": "Top pick when indels are a worry: roughly a quarter of TCBE-Umax indel levels."
+    },
+    {
+      "id": "TCBE-Umax-ex2",
+      "family": "CBE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [4, 16],
+      "peak": [13, 15],
+      "precise": false,
+      "source": "qin2026",
+      "use": "PAM-proximal cytosines, peak activity at 13-15."
+    },
+    {
+      "id": "TCBE-Umax2",
+      "family": "CBE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [4, 10],
+      "peak": [4, 8],
+      "precise": false,
+      "penalty": 6,
+      "source": "qin2026",
+      "use": "Rescue tool for loci TCBE-Umax edits poorly. Higher indels and off-target; not a default."
+    },
+    {
+      "id": "TCBE-Umax-rest1",
+      "activity": 0.44,
+      "family": "CBE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [5, 7],
+      "peak": [5, 7],
+      "precise": true,
+      "source": "qin2026",
+      "use": "Avoids editing at C4. Retains ~44% activity. Can give C-to-G products at TCT motifs."
+    },
+    {
+      "id": "TCBE-Umax-rest2",
+      "activity": 0.75,
+      "family": "CBE",
+      "cas": "SpCas9",
+      "pam": "NGG",
+      "window": [4, 7],
+      "peak": [4, 7],
+      "precise": true,
+      "source": "qin2026",
+      "use": "Best precision editor overall: ~75% of TCBE-Umax activity, lowest bystander editing. Can give C-to-G products at TCT motifs."
+    },
+    {
+      "id": "TCBE-Umax-SpRY",
+      "family": "CBE",
+      "cas": "SpRY",
+      "pam": "NNN",
+      "window": [4, 10],
+      "peak": [4, 8],
+      "precise": false,
+      "source": "qin2026",
+      "pamPreference": ["NAN", "NYN"],
+      "use": "No G in the PAM. PAM preference NAN > NYN."
+    },
+    {
+      "id": "TCBE-Umax-SpG",
+      "family": "CBE",
+      "cas": "SpG",
+      "pam": "NGN",
+      "window": [4, 10],
+      "peak": [4, 8],
+      "precise": false,
+      "source": "qin2026",
+      "use": "NGN sites. Outperformed SpRY at the kras R26C NGA locus."
+    },
+    {
+      "id": "TCBE-Umax-NG",
+      "family": "CBE",
+      "cas": "Cas9-NG",
+      "pam": "NGN",
+      "window": [4, 10],
+      "peak": [4, 8],
+      "precise": false,
+      "source": "qin2026",
+      "use": "NGN sites. Outperformed SpRY at the kras E484K NGT locus."
+    }
+  ]
+}

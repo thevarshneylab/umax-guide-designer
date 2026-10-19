@@ -1,0 +1,55 @@
+cff-version: 1.2.0
+title: Umax Guide Designer
+message: >-
+  If you use this tool, please cite the two publications the editor
+  parameters are taken from, listed under references below.
+type: software
+authors:
+  - family-names: Varshney
+    given-names: Gaurav K.
+    affiliation: Oklahoma Medical Research Foundation, Oklahoma City, OK, USA
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/thevarshneylab/umax-guide-designer"
+url: "https://thevarshneylab.github.io/umax-guide-designer/"
+abstract: >-
+  A browser-based sgRNA designer for zebrafish base editing with the
+  ABE-Umax and TCBE-Umax editor families. Places a chosen target base
+  within each editor's published editing window and reports bystander
+  edits and codon-level consequences.
+keywords:
+  - CRISPR
+  - base editing
+  - zebrafish
+  - sgRNA design
+  - ABE-Umax
+  - TCBE-Umax
+license: MIT
+version: 0.1.0
+date-released: "2026-10-19"
+references:
+  - type: article
+    title: >-
+      ABE-ultramax for high-efficiency biallelic adenine base editing in
+      zebrafish
+    authors:
+      - family-names: Qin
+        given-names: Wei
+      - family-names: Varshney
+        given-names: Gaurav K.
+    journal: Nature Communications
+    volume: 15
+    start: 5613
+    year: 2024
+    doi: 10.1038/s41467-024-49943-1
+  - type: article
+    title: >-
+      High-efficiency TadA cytosine base editors for precise modelling of
+      human disease variants
+    authors:
+      - family-names: Qin
+        given-names: Wei
+      - family-names: Varshney
+        given-names: Gaurav K.
+    journal: Nature Biomedical Engineering
+    year: 2026
+    doi: 10.1038/s41551-025-01607-1
