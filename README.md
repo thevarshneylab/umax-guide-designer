@@ -44,7 +44,7 @@ Note that **rest2 does not win here**, even though it is the narrowest editor. I
 
 ## What it does
 
-- **Scans both strands.** Base editors deaminate the displaced protospacer strand, so an A or C needs a sense-strand guide and a T or G needs an antisense one. The tool picks the strand; you never reverse-complement by hand.
+- **Scans both strands.** Base editors deaminate the displaced protospacer strand, so an A or C needs a sense-strand guide and a T or G needs an antisense one. The tool picks the strand; you never reverse-complement by hand. Note which side the PAM then falls on: for a sense-strand guide it is **downstream** of the target in the sequence you pasted, for an antisense-strand guide it is **upstream**. A target near the 5' end of a short pasted region therefore has no room for an antisense guide — paste roughly 30 nt of flanking sequence on *both* sides of the target and every editor in the suite can be reached.
 - **Places the target in each editor's real window**, not a generic 4–8.
 - **Finds bystanders** — every other editable base inside the window — and shows where they fall.
 - **Translates the consequence.** Give it a reading frame and each guide reports the on-target change and every bystander change: silent, missense, or premature stop. Leave the frame unset for splice-site and non-coding work.

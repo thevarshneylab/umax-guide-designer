@@ -323,6 +323,69 @@
     return guides;
   }
 
+  /**
+   * Why a target has no guides, in terms of the sequence the user pasted.
+   *
+   * A guide's PAM sits 3' of the protospacer on the guide's own strand. For a
+   * sense-strand guide that is downstream of the target on the pasted
+   * sequence; for an antisense-strand guide it is UPSTREAM. So a target near
+   * the 5' end of a short pasted region can be undesignable on the antisense
+   * strand purely for lack of room, and the fix is to paste more sequence on
+   * the side this reports.
+   *
+   * @returns {object|null} null when the base is not editable by this family
+   */
+  function flankReport(seq, target, family, editors) {
+    var strand = guideStrandFor(seq.charAt(target), family);
+    if (!strand) return null;
+
+    var upstream = target;
+    var downstream = seq.length - 1 - target;
+
+    /* On the pasted (sense) sequence, which side does the PAM fall on? */
+    var pamSide = strand === "+" ? "downstream" : "upstream";
+    var havePam = strand === "+" ? downstream : upstream;
+    var haveFar = strand === "+" ? upstream : downstream;
+
+    /* One guide has to satisfy both sides at once, so the two requirements
+       cannot be minimized independently — they are checked per (editor,
+       position) pair. `extraPamSide` is the smallest number of additional
+       bases on the PAM side that would make some placement fit, given the
+       room currently available on the far side. */
+    var anyFits = false;
+    var extraPamSide = Infinity;
+    var needFarSide = Infinity;
+
+    for (var i = 0; i < editors.length; i++) {
+      var ed = editors[i];
+      if (ed.family !== family) continue;
+      for (var p = ed.window[0]; p <= ed.window[1]; p++) {
+        var farNeeded = p - 1;
+        var pamNeeded = SPACER_LENGTH - p + ed.pam.length;
+        needFarSide = Math.min(needFarSide, farNeeded);
+        if (haveFar < farNeeded) continue;              // no room for the spacer
+        if (havePam >= pamNeeded) { anyFits = true; break; }
+        extraPamSide = Math.min(extraPamSide, pamNeeded - havePam);
+      }
+      if (anyFits) break;
+    }
+
+    return {
+      strand: strand,
+      pamSide: pamSide,
+      farSide: pamSide === "downstream" ? "upstream" : "downstream",
+      upstream: upstream,
+      downstream: downstream,
+      /* true when no placement can physically fit in the pasted sequence,
+         regardless of what the bases are */
+      shortOnPamSide: !anyFits && extraPamSide !== Infinity,
+      shortOnFarSide: haveFar < needFarSide,
+      extraPamSide: extraPamSide === Infinity ? 0 : extraPamSide,
+      neededFarSide: needFarSide,
+      roomForAnyGuide: anyFits
+    };
+  }
+
   /** Validate editors.json so a bad contribution fails loudly. */
   function validateEditors(data) {
     var problems = [];
@@ -370,6 +433,7 @@
     describeEffect: describeEffect,
     scoreGuide: scoreGuide,
     design: design,
+    flankReport: flankReport,
     validateEditors: validateEditors
   };
 });

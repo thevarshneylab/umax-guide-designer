@@ -89,7 +89,8 @@
 
     var f = UMAX.FAMILY[state.family];
     var product = strand === "+" ? f.to : UMAX.reverseComplement(f.to);
-    text += base + "→" + product + ", via a " + (strand === "+" ? "sense" : "antisense") + "-strand guide.";
+    text += base + "→" + product + ", via " +
+      (strand === "+" ? "a sense-strand guide (PAM downstream)" : "an antisense-strand guide (PAM upstream)") + ".";
 
     var changes = UMAX.codonEffects(state.seq, state.frame, state.family, strand, [state.target]);
     if (changes && changes.length) text += " On-target consequence: " + UMAX.describeEffect(changes[0]) + ".";
@@ -125,8 +126,37 @@
       return;
     }
     if (!state.guides.length) {
-      box.innerHTML = '<div class="empty">No guide places this base inside any ' + state.family +
-        '-Umax window with an available PAM.<br>Try the other editor family, extend the sequence so PAMs further downstream are visible, or consider a different residue in the same codon.</div>';
+      box.innerHTML = '<div class="empty"></div>';
+      var empty = box.firstChild;
+      var flank = UMAX.flankReport(state.seq, state.target, state.family, state.editors);
+
+      if (!flank) {
+        empty.textContent = state.family === "ABE"
+          ? "Adenine base editors change A or T. Pick an A or a T, or switch to the cytosine editors."
+          : "Cytosine base editors change C or G. Pick a C or a G, or switch to the adenine editors.";
+        return;
+      }
+
+      var lines = [];
+      var strandName = flank.strand === "+" ? "sense" : "antisense";
+
+      if (flank.shortOnPamSide) {
+        /* The usual cause: not enough sequence on the side the PAM sits. */
+        lines.push("A " + strandName + "-strand guide is needed here, so its PAM sits <strong>" +
+          flank.pamSide + "</strong> of this base — and only " +
+          (flank.pamSide === "upstream" ? flank.upstream : flank.downstream) +
+          " nt of sequence is pasted on that side.");
+        lines.push("Paste at least " + flank.extraPamSide + " more nt " + flank.pamSide +
+          " of the target. Around 30 nt of flanking sequence on both sides covers every editor in the suite.");
+      } else {
+        lines.push("No PAM in this region puts the base inside a " + state.family +
+          "-Umax window on the " + strandName + " strand.");
+        lines.push("Options: try the other editor family if the change allows it, target a different " +
+          "base in the same codon, or extend the sequence " + flank.pamSide +
+          " in case a usable PAM lies just outside what is pasted.");
+      }
+
+      empty.innerHTML = lines.join("<br><br>");
       return;
     }
     if (!list.length) {

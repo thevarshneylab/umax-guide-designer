@@ -162,6 +162,65 @@ antisense.slice(0, 5).forEach(g => {
     UMAX.reverseComplement(EXAMPLE).indexOf(g.spacer) === g.start);
 });
 
+/* Antisense design must work for every editable base that has room for it,
+   on both families. This is the regression guard for "no antisense guides". */
+["ABE", "CBE"].forEach(family => {
+  const editable = [];
+  for (let i = 0; i < EXAMPLE.length; i++) {
+    if (UMAX.guideStrandFor(EXAMPLE.charAt(i), family) === "-") editable.push(i);
+  }
+  check(family + " has antisense-targetable bases in the example", editable.length > 0);
+
+  const withGuides = editable.filter(i => UMAX.design(EXAMPLE, i, family, EDITORS, FRAME).length > 0);
+  check(family + " designs antisense guides", withGuides.length > 0,
+    withGuides.length + " of " + editable.length + " antisense bases yielded guides");
+
+  /* Every antisense base with ≥30 nt of upstream room must be designable. */
+  editable.filter(i => i >= 30 && i < EXAMPLE.length - 5).forEach(i => {
+    check(family + " antisense base " + (i + 1) + " with ample upstream flank is designable",
+      UMAX.design(EXAMPLE, i, family, EDITORS, FRAME).length > 0);
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * Flank reporting — the PAM side depends on the guide strand
+ * ------------------------------------------------------------------ */
+
+const senseFlank = UMAX.flankReport(EXAMPLE, TARGET, "CBE", EDITORS);
+equal("a sense-strand target needs downstream room", senseFlank.pamSide, "downstream");
+equal("sense target reports its strand", senseFlank.strand, "+");
+
+const gIdx = EXAMPLE.indexOf("G", 20);
+const antiFlank = UMAX.flankReport(EXAMPLE, gIdx, "CBE", EDITORS);
+equal("an antisense-strand target needs upstream room", antiFlank.pamSide, "upstream");
+equal("antisense target reports its strand", antiFlank.strand, "-");
+check("with ample flank, nothing is reported short", !antiFlank.shortOnPamSide);
+check("and a guide physically fits", antiFlank.roomForAnyGuide);
+
+/* Two distinct reasons a target can yield nothing, which the UI must not
+   conflate: no physical room for a spacer, versus room but no matching PAM.
+   The minimum PAM-side room any CBE placement needs is 20 - 16 + 3 = 7
+   (TCBE-Umax-ex2 at position 16), so 4 nt upstream cannot fit anything. */
+const noRoom = EXAMPLE.slice(gIdx - 4);
+const cramped = UMAX.flankReport(noRoom, 4, "CBE", EDITORS);
+equal("a cramped antisense target is short on the upstream side", cramped.shortOnPamSide, true);
+equal("and the side named is upstream, not downstream", cramped.pamSide, "upstream");
+equal("no placement fits at all", cramped.roomForAnyGuide, false);
+check("it says how many more bases are needed", cramped.extraPamSide > 0);
+equal("no guides are found for it", UMAX.design(noRoom, 4, "CBE", EDITORS, -1).length, 0);
+
+/* With 10 nt upstream, TCBE-Umax-ex2 placements do fit geometrically, so a
+   lack of guides there is a PAM problem and must NOT be reported as short. */
+const roomButNoPam = UMAX.flankReport(EXAMPLE.slice(gIdx - 10), 10, "CBE", EDITORS);
+equal("room for a placement is reported as such", roomButNoPam.roomForAnyGuide, true);
+equal("and it is not blamed on flank length", roomButNoPam.shortOnPamSide, false);
+
+check("the same base with full upstream context is designable",
+  UMAX.design(EXAMPLE, gIdx, "CBE", EDITORS, -1).length > 0);
+
+equal("flankReport returns null for a base this family cannot edit",
+  UMAX.flankReport(EXAMPLE, EXAMPLE.indexOf("A"), "CBE", EDITORS), null);
+
 /* Edits on an antisense guide change the sense strand to the complement. */
 equal("antisense CBE edit writes G>A on the sense strand",
   UMAX.applyEdits("ATGCG", "CBE", "-", [4]), "ATGCA");
