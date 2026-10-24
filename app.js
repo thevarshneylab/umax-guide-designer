@@ -770,16 +770,18 @@
       state.data = data;
       state.sources = data.sources || [];
       state.casVariants = data.casVariants || [];
-      state.casVariants.forEach(function (c) { state.casEnabled[c.id] = true; });
       state.allEditors = UMAX.expandEditors(data, { includeUntested: true });
-      /* A backbone whose every pairing is predicted contributes nothing
-         until predicted pairings are switched on. The chip has to say so,
-         or ticking it looks broken. */
+
+      /* A backbone whose every pairing is predicted contributes nothing until
+         predicted pairings are switched on, so it starts unticked and its
+         chip says why. Ticking it is then an explicit choice to work with
+         predictions, matching how the predicted pairings themselves default. */
       state.casHasPublished = {};
       state.casVariants.forEach(function (c) {
         state.casHasPublished[c.id] = (data.editors || []).some(function (e) {
           return e.cas === c.id;
         });
+        state.casEnabled[c.id] = state.casHasPublished[c.id];
       });
       renderCasFilter();
       renderReference();
