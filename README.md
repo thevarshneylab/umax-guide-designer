@@ -183,7 +183,16 @@ Editor parameters live in [`editors.json`](editors.json) and nothing is hard-cod
 
 Three optional keys affect ranking: `"activity": 0.75` for an editor whose reported on-target activity is a fraction of its parent's, `"pamPreference": ["NGN", "NAN", "NYN"]` to tier the PAMs of a relaxed-PAM editor, and `"penalty": 6` to push an editor below its peers for reasons the other fields do not capture.
 
-Then run the tests:
+Then run the tests and re-stamp the page:
+
+```sh
+node test.js
+node tools/stamp.js
+```
+
+The second command is not optional. GitHub Pages revalidates `index.html` much more eagerly than the files it references, so without a version on those URLs a visitor can be served new HTML alongside a cached old script — the page then looks updated but behaves like the previous release, which is harder to diagnose than an obviously stale page. `tools/stamp.js` hashes the assets and writes that hash onto their URLs; CI fails the build if the page is out of date.
+
+The test suite itself:
 
 ```sh
 node test.js

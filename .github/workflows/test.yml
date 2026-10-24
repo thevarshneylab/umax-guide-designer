@@ -19,3 +19,5 @@ jobs:
         run: node --check umax.js && node --check app.js
       - name: Run test suite
         run: node test.js
+      - name: index.html must reference the current asset version
+        run: node tools/stamp.js --check

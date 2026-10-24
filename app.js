@@ -5,6 +5,18 @@
   var EXAMPLE = "ATGGCATCCGAGTTCAAGCGAGGCTACACCAAGAGGCTGAACTGCTCAGATGTGCCTCAGTTTGACAAGCTACAGGCTACGTGGAACCCAGAGTACAGCTGA";
   var EXAMPLE_TARGET = 18;  /* the C of CGA, codon 7 */
 
+  /* The version stamped onto this script's own URL by tools/stamp.js, passed
+     on to anything this script fetches so a cached copy of one asset can
+     never be paired with a fresh copy of another. */
+  var ASSET_VERSION = (function () {
+    var tag = document.currentScript || document.querySelector('script[src*="app.js"]');
+    var match = tag && tag.src && tag.src.match(/[?&]v=([A-Za-z0-9]+)/);
+    return match ? match[1] : "";
+  })();
+  var versioned = function (url) {
+    return ASSET_VERSION ? url + "?v=" + ASSET_VERSION : url;
+  };
+
   var state = {
     seq: "", target: -1, family: "CBE", frame: 0, filter: "all",
     guides: [], editors: [], allEditors: [], sources: [],
@@ -683,7 +695,7 @@
 
   /* ---------- boot ---------- */
 
-  fetch("editors.json")
+  fetch(versioned("editors.json"))
     .then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
