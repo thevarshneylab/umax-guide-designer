@@ -53,6 +53,20 @@ Note that **rest2 does not win here**, even though it is the narrowest editor. I
 - **Tiers relaxed PAMs** the way the papers do: NGN > NAN > NYN for ABE-Umax-SpRY, NAN > NYN for TCBE-Umax-SpRY.
 - **Lets you pick the Cas9 backbone** you have on the bench, and will enumerate untested deaminase × nickase pairings on request, clearly marked as predictions.
 
+## Two ways to use it
+
+**One base.** Click the base you want changed and get every guide that can reach it, ranked. This is the variant-modelling workflow: you know the substitution, you need the best way to install it.
+
+**Scan whole sequence.** Paste a region and get one row per editable base, each with its best guide and the protein consequence. This is the other direction — you have a region and want to know what it is possible to do to it. Filter by consequence to answer specific questions:
+
+- *Premature stop only* lists every base whose edit creates a stop codon, which is the F0 knockout workflow: pick whichever has a clean guide in a favourable position.
+- *Silent only* finds edits that change the sequence without changing the protein, useful for a restriction site or a genotyping handle.
+- *Missense only* is the variant-modelling survey across a whole exon.
+
+The scan reports unreachable bases too, not just reachable ones — a base with no usable guide is a real constraint on an experiment, and it is better seen than inferred from an absence. Click any row to drop into the single-base view for that base. The copy button exports whichever view you are in.
+
+A large scan is a lot of work (bases × editors × window positions), so above roughly 40,000 combinations the tool says so and waits rather than freezing the tab. Shortening the sequence or unticking backbones brings it back under.
+
 ## What it deliberately does not do
 
 **No genome-wide off-target search.** That needs the GRCz11 reference and an index, which is a server, not a web page. Copy a spacer into [CRISPOR](https://crispor.gi.ucsc.edu/) or [Cas-OFFinder](http://www.rgenome.net/cas-offinder/) against *Danio rerio* GRCz11/danRer11 — the same tools both papers used, allowing up to four mismatches and then amplicon-sequencing the top three sites.

@@ -537,6 +537,119 @@ derived.forEach(e => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Whole-sequence scan
+ * ------------------------------------------------------------------ */
+
+const scan = UMAX.scanSequence(EXAMPLE, "CBE", EDITORS, FRAME);
+
+check("the scan finds editable bases", scan.editable > 0);
+check("and reaches most of them", scan.reachable > 0 && scan.reachable <= scan.editable);
+check("it counts guides", scan.totalGuides > 0);
+
+/* Every C and G must appear exactly once, and nothing else. */
+(() => {
+  let expected = 0;
+  for (let i = 0; i < EXAMPLE.length; i++) {
+    if ("CG".indexOf(EXAMPLE.charAt(i)) >= 0) expected++;
+  }
+  equal("every C and G is reported for a CBE scan", scan.editable, expected);
+  equal("one entry per editable base", scan.entries.length, expected);
+  check("entries are in sequence order",
+    scan.entries.every((e, i) => i === 0 || e.index > scan.entries[i - 1].index));
+  check("no non-editable base appears",
+    scan.entries.every(e => "CG".indexOf(e.base) >= 0));
+})();
+
+/* Bases with no usable guide are reported, not silently dropped - that
+   absence is what tells you a region is unreachable. */
+const reachableOnly = UMAX.scanSequence(EXAMPLE, "CBE", EDITORS, FRAME, { reachableOnly: true });
+check("reachableOnly drops unreachable bases", reachableOnly.entries.every(e => e.guideCount > 0));
+equal("and leaves the reachable count unchanged", reachableOnly.reachable, scan.reachable);
+check("the default keeps them", scan.entries.length >= reachableOnly.entries.length);
+
+/* The per-base best guide must be the top of that base's own ranking. */
+scan.entries.filter(e => e.guideCount > 0).forEach(e => {
+  const direct = UMAX.design(EXAMPLE, e.index, "CBE", EDITORS, FRAME);
+  equal("scan guide count matches a direct design at base " + e.position,
+    e.guideCount, direct.length);
+  equal("scan best guide matches the direct ranking at base " + e.position,
+    e.best.editor.id + "@" + e.best.position,
+    direct[0].editor.id + "@" + direct[0].position);
+});
+
+/* Consequence classification. */
+equal("a silent change classifies as silent",
+  UMAX.effectClass({ silent: true, from: "L", to: "L" }), "silent");
+equal("a new stop classifies as nonsense",
+  UMAX.effectClass({ silent: false, from: "R", to: "*" }), "nonsense");
+equal("losing a stop is its own class",
+  UMAX.effectClass({ silent: false, from: "*", to: "R" }), "stop-lost");
+equal("an amino-acid swap is missense",
+  UMAX.effectClass({ silent: false, from: "R", to: "C" }), "missense");
+equal("no effect means no coding consequence", UMAX.effectClass(null), "noncoding");
+
+/* The known nonsense site must be found by a scan, with the same verdict the
+   single-base path gives. */
+(() => {
+  const stops = scan.entries.filter(e => e.effectClass === "nonsense");
+  check("the scan finds premature stops", stops.length > 0);
+  const atTarget = stops.find(e => e.index === TARGET);
+  check("including the worked example's R7*", !!atTarget);
+  if (atTarget) {
+    equal("with the same consequence as the single-base view",
+      UMAX.describeEffect(atTarget.effect), "R7* (premature stop)");
+    equal("and the same best editor", atTarget.best.editor.id, "TCBE-Umax");
+  }
+})();
+
+/* Without a reading frame there are no coding calls, but guides are still
+   found - this is the splice-site and non-coding workflow. */
+(() => {
+  const noFrame = UMAX.scanSequence(EXAMPLE, "CBE", EDITORS, -1);
+  equal("a frameless scan finds the same editable bases", noFrame.editable, scan.editable);
+  equal("and the same guides", noFrame.totalGuides, scan.totalGuides);
+  check("but classifies nothing as coding",
+    noFrame.entries.every(e => e.effectClass === "noncoding"));
+  check("and reports no effects", noFrame.entries.every(e => e.effect === null));
+})();
+
+/* Mixed-product families expose every product's class, so a scan can be
+   filtered on an outcome that is not the intended one. */
+(() => {
+  const ayeScan = UMAX.scanSequence(EXAMPLE, "AYE", EDITORS, FRAME);
+  check("an AYE scan finds bases", ayeScan.editable > 0);
+  check("every AYE entry is flagged as mixed-product",
+    ayeScan.entries.every(e => e.mixedProducts === true));
+  check("each AYE entry classifies all three products",
+    ayeScan.entries.every(e => e.effectClasses.length === 3));
+  check("a CBE entry classifies exactly one",
+    scan.entries.every(e => e.effectClasses.length === 1));
+  check("an AYE scan covers every A and T",
+    ayeScan.editable === EXAMPLE.split("").filter(b => "AT".indexOf(b) >= 0).length);
+})();
+
+/* Both strands are covered: a scan must include antisense-targeted bases. */
+check("the scan includes antisense targets",
+  scan.entries.some(e => e.strand === "-") && scan.entries.some(e => e.strand === "+"));
+
+/* Scanning with the expanded editor set must not break any invariant. */
+(() => {
+  const wide = UMAX.scanSequence(EXAMPLE, "CBE", expanded, FRAME);
+  check("a scan over predicted pairings finds at least as many guides",
+    wide.totalGuides >= scan.totalGuides);
+  check("every scanned best guide still sits in its own window",
+    wide.entries.filter(e => e.best).every(e =>
+      e.best.position >= e.best.editor.window[0] &&
+      e.best.position <= e.best.editor.window[1]));
+})();
+
+/* Degenerate input must not throw. */
+equal("an empty sequence scans to nothing",
+  UMAX.scanSequence("", "CBE", EDITORS, 0).editable, 0);
+equal("a sequence with no editable base scans to nothing",
+  UMAX.scanSequence("AAAAAAAAAA", "CBE", EDITORS, 0).editable, 0);
+
+/* ------------------------------------------------------------------ *
  * Report
  * ------------------------------------------------------------------ */
 

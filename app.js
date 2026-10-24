@@ -8,8 +8,13 @@
   var state = {
     seq: "", target: -1, family: "CBE", frame: 0, filter: "all",
     guides: [], editors: [], allEditors: [], sources: [],
-    casVariants: [], casEnabled: {}, includeUntested: false
+    casVariants: [], casEnabled: {}, includeUntested: false,
+    mode: "one", consequence: "any", scan: null, scanConfirmed: false
   };
+
+  /* Above this much work a synchronous scan would visibly freeze the tab, so
+     the user is asked first rather than left staring at a frozen page. */
+  var SCAN_WARN_UNITS = 40000;
   var $ = function (id) { return document.getElementById(id); };
 
   /* ---------- rendering ---------- */
@@ -335,6 +340,171 @@
     });
   }
 
+  function scanWorkUnits() {
+    var editable = 0;
+    for (var i = 0; i < state.seq.length; i++) {
+      if (UMAX.guideStrandFor(state.seq.charAt(i), state.family)) editable++;
+    }
+    return editable * Math.max(1, state.editors.length);
+  }
+
+  function scanRowMatches(entry) {
+    if (state.consequence === "any") return true;
+    /* With mixed products any outcome reaching the asked-for class counts,
+       because that outcome is one the experiment will actually produce. */
+    return entry.effectClasses.indexOf(state.consequence) >= 0;
+  }
+
+  function renderScan() {
+    var box = $("scanresults");
+    box.textContent = "";
+
+    if (!state.seq.length) {
+      box.innerHTML = '<div class="empty">Paste a sequence to scan.</div>';
+      return;
+    }
+    if (!state.editors.length) {
+      box.innerHTML = '<div class="empty">No Cas9 backbone selected — tick at least one above.</div>';
+      return;
+    }
+
+    var units = scanWorkUnits();
+    if (units > SCAN_WARN_UNITS && !state.scanConfirmed) {
+      var warn = document.createElement("div");
+      warn.className = "warn";
+      warn.innerHTML =
+        "<strong>This scan is large.</strong>" +
+        "<p style='margin:7px 0 0'>About " + units.toLocaleString() +
+        " base-editor combinations. The page will be unresponsive for a few seconds " +
+        "while it runs. Shortening the sequence or unticking some Cas9 backbones " +
+        "makes it quicker.</p>";
+      var go = document.createElement("button");
+      go.type = "button";
+      go.className = "ghost";
+      go.style.marginTop = "12px";
+      go.textContent = "Scan anyway";
+      go.addEventListener("click", function () { state.scanConfirmed = true; renderScan(); });
+      warn.appendChild(go);
+      box.appendChild(warn);
+      $("count").textContent = "";
+      return;
+    }
+
+    var scan = UMAX.scanSequence(state.seq, state.family, state.editors, state.frame);
+    state.scan = scan;
+
+    var rows = scan.entries.filter(function (e) { return e.guideCount > 0 && scanRowMatches(e); });
+    $("count").textContent = "· " + rows.length + " of " + scan.reachable + " editable bases";
+
+    var stats = document.createElement("div");
+    stats.className = "scanstats";
+    var unreachable = scan.editable - scan.reachable;
+    [
+      ["Editable bases", scan.editable],
+      ["With a guide", scan.reachable],
+      ["No guide", unreachable],
+      ["Guides total", scan.totalGuides]
+    ].forEach(function (pair) {
+      var d = document.createElement("div");
+      d.innerHTML = "<span></span><b></b>";
+      d.querySelector("span").textContent = pair[0];
+      d.querySelector("b").textContent = pair[1];
+      stats.appendChild(d);
+    });
+    box.appendChild(stats);
+
+    if (!rows.length) {
+      var none = document.createElement("div");
+      none.className = "empty";
+      none.textContent = state.consequence === "any"
+        ? "No base in this sequence can be edited by the selected editors."
+        : "No editable base gives that consequence. Try another consequence filter, or check the reading frame.";
+      box.appendChild(none);
+      return;
+    }
+
+    var wrap = document.createElement("div");
+    wrap.className = "scanwrap";
+    var table = document.createElement("table");
+    table.className = "scantable";
+    table.innerHTML =
+      "<thead><tr>" +
+        "<th>Base</th><th>Change</th><th>Consequence</th>" +
+        "<th>Best editor</th><th>Spacer + PAM</th><th>Pos</th>" +
+        "<th>Byst.</th><th>Guides</th>" +
+      "</tr></thead><tbody></tbody>";
+    var tbody = table.querySelector("tbody");
+
+    rows.forEach(function (e) {
+      var g = e.best;
+      var tr = document.createElement("tr");
+      tr.tabIndex = 0;
+      tr.title = "Open this base in the single-base view";
+
+      var change = e.mixedProducts
+        ? e.base + "→" + e.spectrum.map(function (o) { return o.observedBase; }).join("/")
+        : e.base + "→" + e.spectrum[0].observedBase;
+
+      var consequence = state.frame < 0 ? "—"
+        : (e.mixedProducts
+            ? e.spectrum.map(function (o) {
+                return o.observedBase + ": " + (o.description || "—");
+              }).join("  ·  ")
+            : (e.spectrum[0].description || "—"));
+
+      var cells = [
+        ["mono", String(e.position) + " " + e.base],
+        ["mono", change],
+        ["tag-" + e.effectClass, consequence],
+        ["", g.editor.id + (g.editor.derived ? " (predicted)" : "")],
+        ["mono", g.spacer + " " + g.pam],
+        ["mono", String(g.position)],
+        ["mono", g.bystanders.length ? String(g.bystanders.length) : "—"],
+        ["mono", String(e.guideCount)]
+      ];
+      cells.forEach(function (c) {
+        var td = document.createElement("td");
+        if (c[0]) td.className = c[0];
+        td.textContent = c[1];
+        tr.appendChild(td);
+      });
+
+      function open() {
+        state.target = e.index;
+        $("pos").value = String(e.position);
+        setMode("one");
+      }
+      tr.addEventListener("click", open);
+      tr.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(); }
+      });
+      tbody.appendChild(tr);
+    });
+
+    wrap.appendChild(table);
+    box.appendChild(wrap);
+
+    var hint = document.createElement("p");
+    hint.className = "hint";
+    hint.style.marginTop = "12px";
+    hint.textContent = "Rows show the best-scoring guide for each base. Click a row to see every guide for it."
+      + (unreachable > 0 ? "  " + unreachable + " editable base" + (unreachable > 1 ? "s have" : " has")
+          + " no usable guide — usually no PAM in range." : "");
+    box.appendChild(hint);
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    state.scanConfirmed = false;
+    $("modeone").className = "segbtn" + (mode === "one" ? " on" : "");
+    $("modeall").className = "segbtn" + (mode === "all" ? " on" : "");
+    $("results").hidden = mode !== "one";
+    $("scanresults").hidden = mode !== "all";
+    $("consequence").hidden = mode !== "all";
+    $("filter").hidden = mode !== "one";
+    render();
+  }
+
   function renderReference() {
     var tbody = $("reftable").querySelector("tbody");
     tbody.textContent = "";
@@ -394,7 +564,12 @@
 
   /* ---------- events ---------- */
 
-  function render() { recompute(); renderTrack(); renderTarget(); renderResults(); }
+  function render() {
+    recompute();
+    renderTrack();
+    renderTarget();
+    if (state.mode === "all") renderScan(); else renderResults();
+  }
 
   function wire() {
     $("track").addEventListener("click", function (ev) {
@@ -407,7 +582,12 @@
 
     $("seq").addEventListener("input", function () {
       var cleaned = UMAX.cleanSequence(this.value);
-      if (cleaned !== state.seq) { state.seq = cleaned; state.target = -1; render(); }
+      if (cleaned !== state.seq) {
+        state.seq = cleaned;
+        state.target = -1;
+        state.scanConfirmed = false;
+        render();
+      }
     });
 
     $("edit").addEventListener("change", function () {
@@ -424,6 +604,7 @@
     });
 
     $("copy").addEventListener("click", function () {
+      if (state.mode === "all") { copyScan(); return; }
       var rows = [["editor", "cas9", "evidence", "strand", "spacer_5to3", "pam",
                    "target_position", "bystander_positions", "gc_percent",
                    "context", "window", "note"]];
@@ -438,6 +619,14 @@
       copyText(rows.map(function (r) { return r.join("\t"); }).join("\n"), "Table copied as TSV");
     });
 
+    $("modeone").addEventListener("click", function () { setMode("one"); });
+    $("modeall").addEventListener("click", function () { setMode("all"); });
+
+    $("consequence").addEventListener("change", function () {
+      state.consequence = this.value;
+      renderScan();
+    });
+
     $("untested").addEventListener("change", function () {
       state.includeUntested = this.checked;
       renderReference();
@@ -445,6 +634,38 @@
     });
 
     $("example").addEventListener("click", loadExample);
+  }
+
+  function copyScan() {
+    if (!state.scan) { toast("Run the scan first"); return; }
+    var header = ["base_position", "base", "change", "consequence", "effect_class",
+                  "editor", "cas9", "evidence", "strand", "spacer_5to3", "pam",
+                  "target_position", "bystander_positions", "gc_percent",
+                  "context", "guides_for_this_base"];
+    var rows = [header];
+
+    state.scan.entries.filter(function (e) {
+      return e.guideCount > 0 && scanRowMatches(e);
+    }).forEach(function (e) {
+      var g = e.best;
+      var change = e.mixedProducts
+        ? e.base + ">" + e.spectrum.map(function (o) { return o.observedBase; }).join("/")
+        : e.base + ">" + e.spectrum[0].observedBase;
+      var consequence = state.frame < 0 ? ""
+        : e.spectrum.map(function (o) {
+            return o.observedBase + ":" + (o.description || "");
+          }).join(" | ");
+      rows.push([
+        e.position, e.base, change, consequence, e.effectClasses.join("|"),
+        g.editor.id, g.editor.cas,
+        g.editor.derived ? "predicted pairing" : (g.editor.unpublished ? "unpublished" : "published"),
+        g.strand, g.spacer, g.pam, g.position,
+        g.bystanders.join("|") || "none", g.gc.toFixed(0), g.context || "",
+        e.guideCount
+      ]);
+    });
+    copyText(rows.map(function (r) { return r.join("\t"); }).join("\n"),
+      "Scan copied as TSV (" + (rows.length - 1) + " rows)");
   }
 
   function loadExample() {
@@ -477,6 +698,7 @@
       state.allEditors = UMAX.expandEditors(data, { includeUntested: true });
       renderCasFilter();
       renderReference();
+      $("consequence").hidden = true;
       wire();
       loadExample();
     })

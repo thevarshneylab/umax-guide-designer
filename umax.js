@@ -465,6 +465,79 @@
   }
 
   /* ------------------------------------------------------------------ *
+   * Whole-sequence scan
+   * ------------------------------------------------------------------ */
+
+  /** Coarse class of a protein change, for filtering a scan. */
+  function effectClass(effect) {
+    if (!effect) return "noncoding";
+    if (effect.silent) return "silent";
+    if (effect.to === "*") return "nonsense";
+    if (effect.from === "*") return "stop-lost";
+    return "missense";
+  }
+
+  /**
+   * Design guides for every editable base in a sequence at once.
+   *
+   * One entry per base the family can act on, carrying its best-scoring guide
+   * and the full product spectrum. Bases with no usable guide are reported
+   * too (guideCount 0) so a scan shows what is unreachable as well as what is
+   * reachable — that absence is usually the more actionable half.
+   *
+   * @param {object} [options]
+   * @param {boolean} [options.reachableOnly=false] drop bases with no guide
+   * @returns {{entries: Array, totalGuides: number, reachable: number, editable: number}}
+   */
+  function scanSequence(seq, family, editors, frame, options) {
+    var opts = options || {};
+    var f = FAMILY[family];
+    if (!f) throw new Error("Unknown editor family: " + family);
+
+    var entries = [];
+    var totalGuides = 0;
+    var reachable = 0;
+    var editable = 0;
+
+    for (var i = 0; i < seq.length; i++) {
+      var strand = guideStrandFor(seq.charAt(i), family);
+      if (!strand) continue;
+      editable++;
+
+      var guides = design(seq, i, family, editors, frame);
+      totalGuides += guides.length;
+      if (guides.length) reachable++;
+      else if (opts.reachableOnly) continue;
+
+      var spectrum = outcomeSpectrum(seq, frame, family, strand, i);
+      var intended = spectrum[0];
+
+      entries.push({
+        index: i,
+        position: i + 1,
+        base: seq.charAt(i),
+        strand: strand,
+        guideCount: guides.length,
+        best: guides.length ? guides[0] : null,
+        spectrum: spectrum,
+        effect: intended.effect,
+        effectClass: effectClass(intended.effect),
+        /* With mixed products the other outcomes matter as much as the
+           intended one, so a scan must be filterable on any of them. */
+        effectClasses: spectrum.map(function (o) { return effectClass(o.effect); }),
+        mixedProducts: !!f.mixedProducts
+      });
+    }
+
+    return {
+      entries: entries,
+      totalGuides: totalGuides,
+      reachable: reachable,
+      editable: editable
+    };
+  }
+
+  /* ------------------------------------------------------------------ *
    * Cas9 backbones
    * ------------------------------------------------------------------ *
    * An editor is a deaminase architecture (which fixes the editing window)
@@ -625,6 +698,8 @@
     describeEffect: describeEffect,
     scoreGuide: scoreGuide,
     design: design,
+    scanSequence: scanSequence,
+    effectClass: effectClass,
     expandEditors: expandEditors,
     architectureOf: architectureOf,
     flankReport: flankReport,
