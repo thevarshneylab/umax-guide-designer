@@ -175,7 +175,10 @@
     $("count").textContent = state.target < 0 ? "" : "· " + list.length + " of " + state.guides.length;
 
     if (!state.editors.length) {
-      box.innerHTML = '<div class="empty">No Cas9 backbone selected — tick at least one above.</div>';
+      var noed = document.createElement("div");
+      noed.className = "empty";
+      noed.textContent = noEditorsMessage();
+      box.appendChild(noed);
       return;
     }
     if (state.target < 0) {
@@ -335,21 +338,50 @@
     var box = $("casfilter");
     box.textContent = "";
     state.casVariants.forEach(function (cas) {
+      var predictedOnly = !state.casHasPublished[cas.id];
       var label = document.createElement("label");
-      label.className = "chip";
-      label.title = cas.note || "";
-      label.innerHTML = '<input type="checkbox"><span class="cname"></span><span class="cpam"></span>';
+      label.className = "chip" + (predictedOnly ? " predonly" : "");
+      label.title = (cas.note || "") +
+        (predictedOnly ? "\n\nNo published pairing with any Umax editor, so selecting this turns on predicted pairings." : "");
+      label.innerHTML = '<input type="checkbox"><span class="cname"></span>' +
+        '<span class="cpam"></span><span class="conly"></span>';
       var input = label.querySelector("input");
       input.checked = state.casEnabled[cas.id] !== false;
-      input.setAttribute("aria-label", cas.id + ", " + cas.pam + " PAM");
+      input.setAttribute("aria-label", cas.id + ", " + cas.pam + " PAM" +
+        (predictedOnly ? ", predicted pairings only" : ""));
       label.querySelector(".cname").textContent = cas.id;
       label.querySelector(".cpam").textContent = cas.pam;
+      label.querySelector(".conly").textContent = predictedOnly ? "predicted only" : "";
       input.addEventListener("change", function () {
         state.casEnabled[cas.id] = this.checked;
+        /* Selecting a backbone that has no published pairing would otherwise
+           change nothing at all. Honour the selection and say what happened. */
+        if (this.checked && predictedOnly && !state.includeUntested) {
+          state.includeUntested = true;
+          $("untested").checked = true;
+          renderReference();
+          toast(cas.id + " has no published pairings — predicted pairings turned on");
+        }
         render();
       });
       box.appendChild(label);
     });
+  }
+
+  /** Why the active editor set is empty, in the user's own terms. */
+  function noEditorsMessage() {
+    var ticked = state.casVariants.filter(function (c) {
+      return state.casEnabled[c.id] !== false;
+    });
+    if (!ticked.length) return "No Cas9 backbone selected — tick at least one above.";
+
+    var predictedOnly = ticked.filter(function (c) { return !state.casHasPublished[c.id]; });
+    if (predictedOnly.length === ticked.length && !state.includeUntested) {
+      var names = predictedOnly.map(function (c) { return c.id; }).join(", ");
+      return "Every pairing with " + names + " is predicted rather than published, " +
+        "so nothing is available until \u201cInclude predicted pairings\u201d is ticked above.";
+    }
+    return "No editors available for the current selection.";
   }
 
   function scanWorkUnits() {
@@ -376,7 +408,11 @@
       return;
     }
     if (!state.editors.length) {
-      box.innerHTML = '<div class="empty">No Cas9 backbone selected — tick at least one above.</div>';
+      var msg = document.createElement("div");
+      msg.className = "empty";
+      msg.textContent = noEditorsMessage();
+      box.appendChild(msg);
+      $("count").textContent = "";
       return;
     }
 
@@ -428,9 +464,37 @@
     if (!rows.length) {
       var none = document.createElement("div");
       none.className = "empty";
-      none.textContent = state.consequence === "any"
-        ? "No base in this sequence can be edited by the selected editors."
-        : "No editable base gives that consequence. Try another consequence filter, or check the reading frame.";
+
+      /* Distinguish "the selection is hiding everything" from "this sequence
+         genuinely has nothing", the same way the single-base view does. */
+      var wider = UMAX.scanSequence(state.seq, state.family, state.allEditors, state.frame);
+      var widerRows = wider.entries.filter(function (e) {
+        return e.guideCount > 0 && scanRowMatches(e);
+      });
+
+      if (widerRows.length && state.consequence === "any") {
+        var blocked = {};
+        widerRows.forEach(function (e) {
+          var ed = e.best.editor;
+          if (state.casEnabled[ed.cas] === false) blocked[ed.cas] = true;
+          else if (!state.includeUntested && ed.derived) blocked[ed.cas] = true;
+        });
+        var names = Object.keys(blocked);
+        none.textContent = names.length
+          ? "Nothing under the current selection, but " + widerRows.length +
+            " base" + (widerRows.length > 1 ? "s are" : " is") + " editable using " +
+            names.join(", ") + ". Tick that backbone above" +
+            (!state.includeUntested ? ", or allow predicted pairings," : "") + " to see them."
+          : "No base in this sequence can be edited by the selected editors.";
+      } else if (state.consequence !== "any") {
+        none.textContent = widerRows.length
+          ? "No editable base gives that consequence under the current selection, but " +
+            widerRows.length + " would with a wider backbone selection."
+          : "No editable base gives that consequence. Try another consequence filter, or check the reading frame.";
+      } else {
+        none.textContent = "No base in this sequence can be edited by the selected editors.";
+      }
+
       box.appendChild(none);
       return;
     }
@@ -708,6 +772,15 @@
       state.casVariants = data.casVariants || [];
       state.casVariants.forEach(function (c) { state.casEnabled[c.id] = true; });
       state.allEditors = UMAX.expandEditors(data, { includeUntested: true });
+      /* A backbone whose every pairing is predicted contributes nothing
+         until predicted pairings are switched on. The chip has to say so,
+         or ticking it looks broken. */
+      state.casHasPublished = {};
+      state.casVariants.forEach(function (c) {
+        state.casHasPublished[c.id] = (data.editors || []).some(function (e) {
+          return e.cas === c.id;
+        });
+      });
       renderCasFilter();
       renderReference();
       $("consequence").hidden = true;
