@@ -464,10 +464,115 @@
     };
   }
 
+  /* ------------------------------------------------------------------ *
+   * Cas9 backbones
+   * ------------------------------------------------------------------ *
+   * An editor is a deaminase architecture (which fixes the editing window)
+   * plus a Cas9 nickase (which fixes the PAM). The published editors pair
+   * only some architectures with some backbones; swapping in another Cas9 is
+   * a construct a lab can build, and the window is expected to carry over
+   * because that is what happened for every published PAM variant. Those
+   * pairings are still predictions, so they are derived separately and
+   * marked, never mixed silently into the published set.
+   */
+
+  /** Strip a trailing Cas9 suffix to get the architecture's base name. */
+  function architectureOf(editorId, casIds) {
+    for (var i = 0; i < casIds.length; i++) {
+      var suffix = "-" + casIds[i];
+      if (editorId.length > suffix.length &&
+          editorId.slice(-suffix.length) === suffix) {
+        return editorId.slice(0, -suffix.length);
+      }
+    }
+    return editorId;
+  }
+
+  /**
+   * Expand the published editors with Cas9 pairings that have not been built.
+   *
+   * @param {object} data  parsed editors.json
+   * @param {object} [options]
+   * @param {boolean} [options.includeUntested=false] add predicted pairings
+   * @returns {Array} editor entries; derived ones carry derived:true and
+   *   basedOn/casNote, and inherit the parent's window, peak and context
+   */
+  function expandEditors(data, options) {
+    var opts = options || {};
+    var published = data.editors || [];
+    var variants = data.casVariants || [];
+    if (!opts.includeUntested || !variants.length) return published.slice();
+
+    var casIds = variants.map(function (c) { return c.id; });
+    var casById = {};
+    variants.forEach(function (c) { casById[c.id] = c; });
+
+    /* What already exists, so nothing is duplicated or contradicted. */
+    var haveParent = {};
+    var seenPairing = {};
+    var familyCasPreference = {};
+    published.forEach(function (ed) {
+      var arch = architectureOf(ed.id, casIds);
+      seenPairing[arch + "|" + ed.cas] = true;
+      if (ed.cas === "SpCas9") haveParent[arch] = ed;
+      if (ed.pamPreference) familyCasPreference[ed.family + "|" + ed.cas] = ed.pamPreference;
+    });
+
+    var out = published.slice();
+    Object.keys(haveParent).forEach(function (arch) {
+      var parent = haveParent[arch];
+      variants.forEach(function (cas) {
+        if (cas.id === "SpCas9") return;
+        if (seenPairing[arch + "|" + cas.id]) return;
+
+        var preference = familyCasPreference[parent.family + "|" + cas.id] || cas.pamPreference;
+        var derived = {
+          id: arch + "-" + cas.id,
+          family: parent.family,
+          cas: cas.id,
+          pam: cas.pam,
+          window: parent.window.slice(),
+          peak: parent.peak.slice(),
+          precise: !!parent.precise,
+          source: parent.source,
+          derived: true,
+          basedOn: parent.id,
+          casNote: cas.note || "",
+          unpublished: true,
+          use: "Predicted pairing: the " + arch + " architecture on a " + cas.id +
+               " nickase (" + cas.pam + " PAM). Not reported, so the window is " +
+               "assumed to carry over from " + parent.id + " and the activity is unknown."
+        };
+        if (preference) derived.pamPreference = preference.slice();
+        if (parent.favorableContexts) derived.favorableContexts = parent.favorableContexts.slice();
+        if (typeof parent.activity === "number") derived.activity = parent.activity;
+        if (parent.penalty) derived.penalty = parent.penalty;
+        out.push(derived);
+      });
+    });
+    return out;
+  }
+
   /** Validate editors.json so a bad contribution fails loudly. */
   function validateEditors(data) {
     var problems = [];
     if (!data || !Array.isArray(data.editors)) return ["editors.json has no `editors` array"];
+
+    /* The Cas9 registry, when present, is the single source of truth for
+       PAMs: an editor that disagrees with it is a typo in one of the two. */
+    var casPam = {};
+    if (Array.isArray(data.casVariants)) {
+      var casIds = {};
+      data.casVariants.forEach(function (c, i) {
+        var where = "casVariants " + (c.id || i);
+        if (!c.id) problems.push(where + ": missing id");
+        if (casIds[c.id]) problems.push(where + ": duplicate id");
+        casIds[c.id] = true;
+        if (!c.pam || !/^[ACGTRYSWKMBDHVN]+$/.test(c.pam)) problems.push(where + ": invalid pam");
+        else casPam[c.id] = c.pam;
+      });
+    }
+
     var ids = {};
     data.editors.forEach(function (ed, i) {
       var where = ed.id || "entry " + i;
@@ -488,6 +593,13 @@
         }
       }
       if (!ed.use) problems.push(where + ": missing `use` note");
+      if (casPam[ed.cas] && ed.pam !== casPam[ed.cas]) {
+        problems.push(where + ": pam " + ed.pam + " disagrees with the " + ed.cas +
+          " registry entry (" + casPam[ed.cas] + ")");
+      }
+      if (ed.cas && Object.keys(casPam).length && !casPam[ed.cas]) {
+        problems.push(where + ": cas \"" + ed.cas + "\" is not in casVariants");
+      }
     });
     return problems;
   }
@@ -513,6 +625,8 @@
     describeEffect: describeEffect,
     scoreGuide: scoreGuide,
     design: design,
+    expandEditors: expandEditors,
+    architectureOf: architectureOf,
     flankReport: flankReport,
     validateEditors: validateEditors
   };

@@ -51,6 +51,7 @@ Note that **rest2 does not win here**, even though it is the narrowest editor. I
 - **Reports the whole product spectrum** for adenine transversion editing, where one edited base resolves into A→C, A→T and residual A→G — each with its own protein consequence.
 - **Ranks candidates** by window fit, PAM quality, bystander burden, reported on-target activity, GC content and poly-T tracts. Two parts of that are worth knowing: a bystander the reading frame shows to be silent is discounted almost to nothing, and the narrow-window editors are discounted by the activity they give up, so they rise to the top only where they actually remove a bystander.
 - **Tiers relaxed PAMs** the way the papers do: NGN > NAN > NYN for ABE-Umax-SpRY, NAN > NYN for TCBE-Umax-SpRY.
+- **Lets you pick the Cas9 backbone** you have on the bench, and will enumerate untested deaminase × nickase pairings on request, clearly marked as predictions.
 
 ## What it deliberately does not do
 
@@ -62,7 +63,7 @@ Note that **rest2 does not win here**, even though it is the narrowest editor. I
 
 ## Editors covered
 
-All nineteen editors from the three studies. Windows are protospacer positions counted from the PAM-distal end of the 20-nt spacer, with the PAM at positions 21–23.
+All nineteen published editors from the three studies, on five selectable Cas9 backbones. Windows are protospacer positions counted from the PAM-distal end of the 20-nt spacer, with the PAM at positions 21–23.
 
 ### Adenine (A→G) — Qin et al. 2024
 
@@ -113,6 +114,38 @@ The rest1/rest2/rest3 cytosine editors can produce C-to-G products at TCT motifs
 One negative result worth knowing: co-expressing Polη helped in mammalian and maize systems but **did not** help in zebrafish — it left the A→C fraction unchanged and reduced overall efficiency. Not worth trying.
 
 Plasmids are on Addgene: [#222138–222144](https://www.addgene.org/browse/article/28248191/) for the ABE-Umax series.
+
+## Cas9 backbones
+
+An editor is two separable things: a **deaminase architecture**, which fixes the editing window, and a **Cas9 nickase**, which fixes the PAM. The tool models them separately, so you can restrict the search to the nickases your lab actually has.
+
+| Backbone | PAM | Notes |
+|---|---|---|
+| SpCas9 | NGG | Canonical. Highest activity wherever a GG is available |
+| SpG | NGN | Only a single G needed, at PAM position 2 |
+| Cas9-NG | NGN | Also NGN; can beat SpG or SpRY at particular loci |
+| SpRY | NNN | Near-PAMless. Broadest access, lower per-site activity |
+| iSpyMac | NAA | Adenine-dinucleotide PAMs — reaches A-rich sites no NGN or NGG backbone can |
+
+[iSpyMac](https://doi.org/10.1038/s41467-020-16117-8) recognizes 5′-NAAN-3′, including AAAA sites that SpyMac edits poorly. That makes it complementary rather than redundant with SpRY: where the only PAM available is A-rich, it is the backbone with a defined preference for it rather than a near-PAMless fallback.
+
+**Published pairings versus predicted ones.** The papers built only some architectures on some backbones — SpRY for ABE-Umax, and SpG/NG/SpRY for TCBE-Umax and zAYE-1028. Any other combination is a construct a lab can make but nobody has reported. The tool will enumerate those if you tick **Include predicted pairings**, and marks each one *predicted pairing* in the results, in the reference table and in the exported table. Their windows are assumed to carry over from the parent editor, which is what happened for every published PAM variant, but the activity is unknown. They are off by default.
+
+No iSpyMac pairing with any Umax editor has been reported, so every iSpyMac row is predicted. SpyMac itself has been used in a zebrafish cytosine base editor (ancBE4max-SpymacCas9, NAA PAM), which is the nearest precedent.
+
+## Adding a Cas9 backbone
+
+Add an entry to `casVariants` in [`editors.json`](editors.json):
+
+```json
+{
+  "id": "SaCas9",
+  "pam": "NNGRRT",
+  "note": "One line on when to reach for this backbone."
+}
+```
+
+It becomes available to every architecture immediately; no code change. `pam` accepts IUPAC codes and any length. Optionally add `"pamPreference": ["NGN", "NAN", "NYN"]` to tier a relaxed PAM, and `"untestedWithUmax": true` if no pairing has been characterized. The test suite cross-checks every editor's PAM against this registry, so a typo in either place fails loudly.
 
 ## Adding an editor
 

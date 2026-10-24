@@ -131,6 +131,24 @@ details summary{cursor:pointer;font-weight:600;font-size:14px}
 .outcome.byproduct code{border-color:var(--bystander);color:var(--bystander)}
 .outcome .okind{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .unpub{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--bystander);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  display:inline-flex;align-items:baseline;gap:7px;cursor:pointer;
+  border:1px solid var(--line);border-radius:99px;padding:5px 12px 5px 10px;
+  font-size:13px;user-select:none;
+}
+.chip input{margin:0;accent-color:var(--accent)}
+.chip .cpam{font-family:var(--font-mono);font-size:11.5px;color:var(--muted)}
+.chip:has(input:checked){border-color:var(--accent)}
+.chip:has(input:checked) .cname{color:var(--accent);font-weight:600}
+.chip:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.toggle{
+  display:flex;gap:9px;align-items:flex-start;margin-top:14px;cursor:pointer;
+  font-size:12.5px;color:var(--muted);font-weight:400;letter-spacing:0;max-width:72ch;
+}
+.toggle input{margin:2px 0 0;accent-color:var(--accent);flex:none}
+.derived{border-style:dashed}
+.pred{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
 a{color:var(--accent)}
 @media (max-width:520px){.field.grow{width:100%}}
 </style>
@@ -197,6 +215,16 @@ a{color:var(--accent)}
 </section>
 
 <section>
+  <div class="panel" style="margin-bottom:16px">
+    <p class="eyebrow" style="margin:0 0 4px">Cas9 backbone · PAM</p>
+    <p class="hint" style="margin:0 0 10px">Restrict the search to the nickases you have. The backbone sets the PAM; the editing window comes from the deaminase architecture.</p>
+    <div id="casfilter" class="chips"></div>
+    <label class="toggle">
+      <input type="checkbox" id="untested">
+      <span>Include predicted pairings — architectures crossed with backbones nobody has reported, where the window is assumed to carry over from the parent editor</span>
+    </label>
+  </div>
+
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px">
     <p class="eyebrow" style="margin:0">Guides <span id="count"></span></p>
     <div class="row" style="gap:8px">

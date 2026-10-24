@@ -396,6 +396,147 @@ EDITORS.filter(e => e.family === "AYE" && e.pam === "NGG").forEach(ed => {
 })();
 
 /* ------------------------------------------------------------------ *
+ * Cas9 registry and predicted pairings
+ * ------------------------------------------------------------------ */
+
+check("editors.json carries a Cas9 registry", Array.isArray(data.casVariants));
+const CAS = {};
+data.casVariants.forEach(c => { CAS[c.id] = c; });
+
+equal("SpCas9 is NGG", CAS["SpCas9"].pam, "NGG");
+equal("SpG is NGN", CAS["SpG"].pam, "NGN");
+equal("Cas9-NG is NGN", CAS["Cas9-NG"].pam, "NGN");
+equal("SpRY is NNN", CAS["SpRY"].pam, "NNN");
+equal("iSpyMac recognizes adenine dinucleotides", CAS["iSpyMac"].pam, "NAA");
+equal("iSpyMac is flagged as untested with the Umax editors",
+  CAS["iSpyMac"].untestedWithUmax, true);
+
+/* Every published editor's PAM must agree with the registry — this is what
+   makes the registry the single source of truth rather than a second copy. */
+EDITORS.forEach(ed => {
+  check(ed.id + " uses a registered backbone", !!CAS[ed.cas], "unknown cas: " + ed.cas);
+  if (CAS[ed.cas]) {
+    equal(ed.id + " PAM agrees with the " + ed.cas + " registry entry", ed.pam, CAS[ed.cas].pam);
+  }
+});
+
+/* A registry/editor PAM mismatch must be caught, not silently tolerated. */
+(() => {
+  const broken = JSON.parse(JSON.stringify(data));
+  broken.editors[0].pam = "NGN";           // editors[0] is an NGG SpCas9 editor
+  const problems = UMAX.validateEditors(broken);
+  check("a PAM that contradicts the registry is rejected",
+    problems.some(m => /disagrees with/.test(m)), problems.join("; "));
+})();
+(() => {
+  const broken = JSON.parse(JSON.stringify(data));
+  broken.editors[0].cas = "SpNonsense";
+  const problems = UMAX.validateEditors(broken);
+  check("an unregistered backbone is rejected",
+    problems.some(m => /not in casVariants/.test(m)), problems.join("; "));
+})();
+
+/* Architecture names are recovered by stripping a trailing Cas9 suffix. */
+const casIds = data.casVariants.map(c => c.id);
+equal("a parent editor is its own architecture",
+  UMAX.architectureOf("TCBE-Umax", casIds), "TCBE-Umax");
+equal("a PAM variant resolves to its parent architecture",
+  UMAX.architectureOf("TCBE-Umax-SpRY", casIds), "TCBE-Umax");
+equal("a suffixed precision editor resolves correctly",
+  UMAX.architectureOf("ABE-Umax-ex2-rest1", casIds), "ABE-Umax-ex2-rest1");
+equal("iSpyMac suffixes are stripped",
+  UMAX.architectureOf("zAYE-1028-iSpyMac", casIds), "zAYE-1028");
+
+/* Expansion: published-only by default, predictions only on request. */
+const publishedOnly = UMAX.expandEditors(data, { includeUntested: false });
+equal("expansion defaults to the published set", publishedOnly.length, EDITORS.length);
+check("no derived editors leak into the published set",
+  publishedOnly.every(e => !e.derived));
+
+const expanded = UMAX.expandEditors(data, { includeUntested: true });
+check("expansion adds pairings", expanded.length > EDITORS.length);
+check("every published editor survives expansion unchanged",
+  EDITORS.every(ed => expanded.some(e => e.id === ed.id && !e.derived)));
+
+const derived = expanded.filter(e => e.derived);
+check("derived pairings exist", derived.length > 0);
+check("every derived pairing is marked unpublished", derived.every(e => e.unpublished));
+check("every derived pairing names its parent",
+  derived.every(e => typeof e.basedOn === "string" && e.basedOn.length > 0));
+check("no derived pairing duplicates a published one",
+  derived.every(e => !EDITORS.some(p => p.id === e.id)));
+check("no two expanded editors share an id",
+  new Set(expanded.map(e => e.id)).size === expanded.length);
+
+/* A derived pairing inherits the window from its parent and the PAM from the
+   backbone — that split is the whole point of the model. */
+derived.forEach(e => {
+  const parent = EDITORS.find(p => p.id === e.basedOn);
+  check(e.id + " inherits its parent's window", !!parent &&
+    JSON.stringify(e.window) === JSON.stringify(parent.window));
+  check(e.id + " inherits its parent's peak", !!parent &&
+    JSON.stringify(e.peak) === JSON.stringify(parent.peak));
+  check(e.id + " inherits its parent's family", !!parent && e.family === parent.family);
+  check(e.id + " takes the PAM from its backbone", e.pam === CAS[e.cas].pam);
+  if (parent && parent.favorableContexts) {
+    check(e.id + " carries the parent's sequence-context preference",
+      JSON.stringify(e.favorableContexts) === JSON.stringify(parent.favorableContexts));
+  }
+});
+
+/* SpRY's PAM tiering differs by family in the published editors, so a derived
+   SpRY pairing must inherit the tiering of its own family, not a global one. */
+(() => {
+  const abeSpRY = EDITORS.find(e => e.id === "ABE-Umax-SpRY");
+  const cbeSpRY = EDITORS.find(e => e.id === "TCBE-Umax-SpRY");
+  check("the two published SpRY editors tier PAMs differently",
+    JSON.stringify(abeSpRY.pamPreference) !== JSON.stringify(cbeSpRY.pamPreference));
+  const derivedAbeSpRY = derived.find(e => e.cas === "SpRY" && e.family === "ABE");
+  const derivedCbeSpRY = derived.find(e => e.cas === "SpRY" && e.family === "CBE");
+  if (derivedAbeSpRY) equal("a derived ABE SpRY pairing inherits the ABE tiering",
+    derivedAbeSpRY.pamPreference, abeSpRY.pamPreference);
+  if (derivedCbeSpRY) equal("a derived CBE SpRY pairing inherits the CBE tiering",
+    derivedCbeSpRY.pamPreference, cbeSpRY.pamPreference);
+})();
+
+/* iSpyMac must actually reach NAA sites that no NGN or NGG backbone can. */
+(() => {
+  const ispymac = expanded.filter(e => e.cas === "iSpyMac");
+  check("iSpyMac pairings were generated", ispymac.length > 0);
+  check("every architecture gained an iSpyMac pairing",
+    ispymac.length === EDITORS.filter(e => e.cas === "SpCas9").length);
+
+  /* An A at position 7 with only an AAA PAM downstream: unreachable with
+     NGG/NGN, reachable with iSpyMac. */
+  const spacer = "CCCCCCACCCCCCCCCCCCC";          // A at position 7
+  const seq = "C".repeat(10) + spacer + "AAA" + "C".repeat(10);
+  const targetIdx = 10 + 6;
+  equal("the constructed target is an A", seq.charAt(targetIdx), "A");
+
+  const nggOnly = expanded.filter(e => e.pam === "NGG" || e.pam === "NGN");
+  equal("no NGG or NGN backbone reaches an AAA-PAM site",
+    UMAX.design(seq, targetIdx, "ABE", nggOnly, -1).length, 0);
+
+  const withIspymac = UMAX.design(seq, targetIdx, "ABE",
+    expanded.filter(e => e.cas === "iSpyMac"), -1);
+  check("iSpyMac reaches it", withIspymac.length > 0);
+  check("and reports the NAA PAM", withIspymac.every(g => UMAX.matchesPam(g.pam, "NAA")));
+})();
+
+/* Derived pairings must still obey every design invariant. */
+["ABE", "CBE", "AYE"].forEach(family => {
+  for (let i = 0; i < EXAMPLE.length; i++) {
+    if (!UMAX.guideStrandFor(EXAMPLE.charAt(i), family)) continue;
+    UMAX.design(EXAMPLE, i, family, expanded, FRAME).forEach(g => {
+      check("expanded set, " + family + " base " + (i + 1) + ": " + g.editor.id + " stays in window",
+        g.position >= g.editor.window[0] && g.position <= g.editor.window[1]);
+      check("expanded set, " + family + " base " + (i + 1) + ": " + g.editor.id + " PAM is valid",
+        UMAX.matchesPam(g.pam, g.editor.pam));
+    });
+  }
+});
+
+/* ------------------------------------------------------------------ *
  * Report
  * ------------------------------------------------------------------ */
 

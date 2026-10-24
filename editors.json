@@ -17,6 +17,16 @@
       "doi": "",
       "status": "unpublished",
       "note": "Parameters below are taken from the manuscript and may change before publication."
+    },
+    {
+      "key": "wang2020ispymac",
+      "citation": "Chatterjee P, Jakimo N, Lee J, et al. A Cas9 with PAM recognition for adenine dinucleotides. Nat Commun. 2020;11:2474.",
+      "doi": "10.1038/s41467-020-16117-8"
+    },
+    {
+      "key": "rosello2022",
+      "citation": "Rosello M, Serafini M, Mignani L, et al. Disease modeling by efficient genome editing using a near PAM-less base editor in vivo. Nat Commun. 2022;13:3435.",
+      "doi": "10.1038/s41467-022-31172-z"
     }
   ],
   "editors": [
@@ -372,6 +382,41 @@
         "CAA"
       ],
       "use": "Last resort when no G is available in the PAM. Supported editing at NAG, NAA and NTG targets. Few sites tested, so treat any PAM ranking as provisional."
+    }
+  ],
+  "casVariants": [
+    {
+      "id": "SpCas9",
+      "pam": "NGG",
+      "note": "Canonical SpCas9 nickase. Highest activity wherever a GG is available."
+    },
+    {
+      "id": "SpG",
+      "pam": "NGN",
+      "note": "Needs only a single G at PAM position 2."
+    },
+    {
+      "id": "Cas9-NG",
+      "pam": "NGN",
+      "note": "Also NGN. Can outperform SpG or SpRY at particular loci, so worth testing in parallel with SpG."
+    },
+    {
+      "id": "SpRY",
+      "pam": "NNN",
+      "note": "Near-PAMless. Broadest access but lower per-site activity and more off-target potential; test several guides.",
+      "pamPreference": [
+        "NGN",
+        "NAN",
+        "NYN"
+      ]
+    },
+    {
+      "id": "iSpyMac",
+      "pam": "NAA",
+      "note": "Recognizes adenine-dinucleotide 5'-NAAN-3' PAMs, including AAAA sites that SpyMac edits poorly. Reaches targets no NGN or NGG backbone can, and complements SpRY where an A-rich PAM is all that is available.",
+      "source": "wang2020ispymac",
+      "zebrafishNote": "SpyMac has been used in a zebrafish cytosine base editor (ancBE4max-SpymacCas9, NAA PAM), but no iSpyMac pairing with the Umax editors has been reported, so every pairing below is predicted rather than tested.",
+      "untestedWithUmax": true
     }
   ]
 }

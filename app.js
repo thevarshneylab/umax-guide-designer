@@ -5,13 +5,26 @@
   var EXAMPLE = "ATGGCATCCGAGTTCAAGCGAGGCTACACCAAGAGGCTGAACTGCTCAGATGTGCCTCAGTTTGACAAGCTACAGGCTACGTGGAACCCAGAGTACAGCTGA";
   var EXAMPLE_TARGET = 18;  /* the C of CGA, codon 7 */
 
-  var state = { seq: "", target: -1, family: "CBE", frame: 0, filter: "all", guides: [], editors: [], sources: [] };
+  var state = {
+    seq: "", target: -1, family: "CBE", frame: 0, filter: "all",
+    guides: [], editors: [], allEditors: [], sources: [],
+    casVariants: [], casEnabled: {}, includeUntested: false
+  };
   var $ = function (id) { return document.getElementById(id); };
 
   /* ---------- rendering ---------- */
 
+  /** Editors available given the backbone selection and the untested toggle. */
+  function activeEditors() {
+    return state.allEditors.filter(function (ed) {
+      if (!state.includeUntested && ed.derived) return false;
+      return state.casEnabled[ed.cas] !== false;
+    });
+  }
+
   function recompute() {
     state.guides = [];
+    state.editors = activeEditors();
     if (state.target < 0 || state.target >= state.seq.length || !state.editors.length) return;
     state.guides = UMAX.design(state.seq, state.target, state.family, state.editors, state.frame);
   }
@@ -144,6 +157,10 @@
     var list = state.guides.filter(passesFilter);
     $("count").textContent = state.target < 0 ? "" : "· " + list.length + " of " + state.guides.length;
 
+    if (!state.editors.length) {
+      box.innerHTML = '<div class="empty">No Cas9 backbone selected — tick at least one above.</div>';
+      return;
+    }
     if (state.target < 0) {
       box.innerHTML = '<div class="empty">Select a base in the sequence to design guides for it.</div>';
       return;
@@ -158,6 +175,29 @@
           ? "Adenine base editors change A or T. Pick an A or a T, or switch to the cytosine editors."
           : "Cytosine base editors change C or G. Pick a C or a G, or switch to the adenine editors.";
         return;
+      }
+
+      /* Before blaming the sequence, check whether the user's own backbone
+         selection is what removed the guides. */
+      var everything = state.allEditors;
+      var withoutFilters = UMAX.design(state.seq, state.target, state.family, everything, state.frame);
+      if (withoutFilters.length) {
+        var missingCas = {};
+        withoutFilters.forEach(function (g) {
+          var hiddenByCas = state.casEnabled[g.editor.cas] === false;
+          var hiddenByToggle = !state.includeUntested && g.editor.derived;
+          if (hiddenByCas || hiddenByToggle) missingCas[g.editor.cas] = true;
+        });
+        var names = Object.keys(missingCas);
+        if (names.length) {
+          empty.innerHTML =
+            "No guides under the current selection, but " + withoutFilters.length +
+            " would be available using " + names.join(", ") +
+            ".<br><br>Tick that backbone above" +
+            (!state.includeUntested ? ", or allow predicted pairings," : "") +
+            " to see them.";
+          return;
+        }
       }
 
       var lines = [];
@@ -239,7 +279,13 @@
         '<p class="note"></p>';
 
       card.querySelector(".ename").textContent = ed.id;
-      if (ed.unpublished) {
+      if (ed.derived) {
+        var pred = document.createElement("span");
+        pred.className = "pred";
+        pred.textContent = " predicted pairing";
+        card.querySelector(".ename").appendChild(pred);
+        card.className += " derived";
+      } else if (ed.unpublished) {
         var badge = document.createElement("span");
         badge.className = "unpub";
         badge.textContent = " unpublished";
@@ -268,10 +314,31 @@
     });
   }
 
+  function renderCasFilter() {
+    var box = $("casfilter");
+    box.textContent = "";
+    state.casVariants.forEach(function (cas) {
+      var label = document.createElement("label");
+      label.className = "chip";
+      label.title = cas.note || "";
+      label.innerHTML = '<input type="checkbox"><span class="cname"></span><span class="cpam"></span>';
+      var input = label.querySelector("input");
+      input.checked = state.casEnabled[cas.id] !== false;
+      input.setAttribute("aria-label", cas.id + ", " + cas.pam + " PAM");
+      label.querySelector(".cname").textContent = cas.id;
+      label.querySelector(".cpam").textContent = cas.pam;
+      input.addEventListener("change", function () {
+        state.casEnabled[cas.id] = this.checked;
+        render();
+      });
+      box.appendChild(label);
+    });
+  }
+
   function renderReference() {
     var tbody = $("reftable").querySelector("tbody");
     tbody.textContent = "";
-    state.editors.forEach(function (ed) {
+    activeEditors().forEach(function (ed) {
       var tr = document.createElement("tr");
       [ed.id, UMAX.FAMILY[ed.family].label, ed.pam,
        ed.window[0] + "–" + ed.window[1], ed.peak[0] + "–" + ed.peak[1], ed.use
@@ -280,7 +347,11 @@
         if (i >= 1 && i <= 4) td.className = "num";
         if (i === 0) {
           var s = document.createElement("strong"); s.textContent = value; td.appendChild(s);
-          if (ed.unpublished) {
+          if (ed.derived) {
+            var dpred = document.createElement("span");
+            dpred.className = "pred"; dpred.textContent = " predicted";
+            td.appendChild(dpred);
+          } else if (ed.unpublished) {
             var u = document.createElement("span");
             u.className = "unpub"; u.textContent = " unpublished";
             td.appendChild(u);
@@ -353,14 +424,24 @@
     });
 
     $("copy").addEventListener("click", function () {
-      var rows = [["editor", "strand", "spacer_5to3", "pam", "target_position",
-                   "bystander_positions", "gc_percent", "window", "note"]];
+      var rows = [["editor", "cas9", "evidence", "strand", "spacer_5to3", "pam",
+                   "target_position", "bystander_positions", "gc_percent",
+                   "context", "window", "note"]];
       state.guides.filter(passesFilter).forEach(function (g) {
-        rows.push([g.editor.id, g.strand, g.spacer, g.pam, g.position,
-                   g.bystanders.join("|") || "none", g.gc.toFixed(0),
-                   g.editor.window[0] + "-" + g.editor.window[1], g.editor.use]);
+        var evidence = g.editor.derived ? "predicted pairing"
+          : (g.editor.unpublished ? "unpublished" : "published");
+        rows.push([g.editor.id, g.editor.cas, evidence, g.strand, g.spacer, g.pam,
+                   g.position, g.bystanders.join("|") || "none", g.gc.toFixed(0),
+                   g.context || "", g.editor.window[0] + "-" + g.editor.window[1],
+                   g.editor.use]);
       });
       copyText(rows.map(function (r) { return r.join("\t"); }).join("\n"), "Table copied as TSV");
+    });
+
+    $("untested").addEventListener("change", function () {
+      state.includeUntested = this.checked;
+      renderReference();
+      render();
     });
 
     $("example").addEventListener("click", loadExample);
@@ -389,8 +470,12 @@
     .then(function (data) {
       var problems = UMAX.validateEditors(data);
       if (problems.length) throw new Error("editors.json is invalid:\n" + problems.join("\n"));
-      state.editors = data.editors;
+      state.data = data;
       state.sources = data.sources || [];
+      state.casVariants = data.casVariants || [];
+      state.casVariants.forEach(function (c) { state.casEnabled[c.id] = true; });
+      state.allEditors = UMAX.expandEditors(data, { includeUntested: true });
+      renderCasFilter();
       renderReference();
       wire();
       loadExample();
