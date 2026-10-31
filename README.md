@@ -145,7 +145,7 @@ An editor is two separable things: a **deaminase architecture**, which fixes the
 
 **Published pairings versus predicted ones.** The papers built only some architectures on some backbones — SpRY for ABE-Umax, and SpG/NG/SpRY for TCBE-Umax and zAYE-1028. Any other combination is a construct a lab can make but nobody has reported. The tool will enumerate those if you tick **Include predicted pairings**, and marks each one *predicted pairing* in the results, in the reference table and in the exported table. Their windows are assumed to carry over from the parent editor, which is what happened for every published PAM variant, but the activity is unknown. They are off by default.
 
-No iSpyMac pairing with any Umax editor has been reported, so **every iSpyMac row is predicted**. Its chip therefore starts unticked and is marked *predicted only*; ticking it is an explicit choice to work with predictions, and switches them on. SpRY, SpG and Cas9-NG each have published pairings, so those are on by default and work with predictions left off. SpyMac itself has been used in a zebrafish cytosine base editor (ancBE4max-SpymacCas9, NAA PAM), which is the nearest precedent.
+Only the **base editors** are offered on iSpyMac — ABE-Umax, TCBE-Umax and zAYE-1028. The ex1, ex2, rest and Umax2 variants are not a nickase swap: they rebuild the Cas9 protein itself, inserting the deaminase at a numbered residue, deleting the HNH domain, or mutating Cas9 directly. No such construct exists on this backbone, so offering it would be inventing a plasmid. No iSpyMac pairing with any Umax editor has been reported at all, so **every iSpyMac row is predicted**. Its chip therefore starts unticked and is marked *predicted only*; ticking it is an explicit choice to work with predictions, and switches them on. SpRY, SpG and Cas9-NG each have published pairings, so those are on by default and work with predictions left off. SpyMac itself has been used in a zebrafish cytosine base editor (ancBE4max-SpymacCas9, NAA PAM), which is the nearest precedent.
 
 ## Adding a Cas9 backbone
 
@@ -159,7 +159,9 @@ Add an entry to `casVariants` in [`editors.json`](editors.json):
 }
 ```
 
-It becomes available to every architecture immediately; no code change. `pam` accepts IUPAC codes and any length. Optionally add `"pamPreference": ["NGN", "NAN", "NYN"]` to tier a relaxed PAM, and `"untestedWithUmax": true` if no pairing has been characterized. The test suite cross-checks every editor's PAM against this registry, so a typo in either place fails loudly.
+It becomes available to every architecture immediately; no code change. `pam` accepts IUPAC codes and any length. Optionally add `"pamPreference": ["NGN", "NAN", "NYN"]` to tier a relaxed PAM, and `"untestedWithUmax": true` if no pairing has been characterized.
+
+Add `"architectures": ["ABE-Umax", "TCBE-Umax"]` when the backbone can only carry some of them. Use it whenever the constructs genuinely do not exist: the ex1, ex2, rest and Umax2 variants modify the Cas9 protein itself, so they are not portable to a backbone by swapping the nickase. Each name must match an SpCas9 parent editor, and a name that does not is a build failure rather than a silent omission. The test suite cross-checks every editor's PAM against this registry, so a typo in either place fails loudly.
 
 ## Adding an editor
 

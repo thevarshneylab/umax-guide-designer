@@ -597,6 +597,11 @@
       variants.forEach(function (cas) {
         if (cas.id === "SpCas9") return;
         if (seenPairing[arch + "|" + cas.id]) return;
+        /* A backbone may restrict which architectures it can carry. The
+           ex/rest variants rebuild the Cas9 protein itself — deaminase
+           inserted at a numbered residue, HNH deleted, Cas9 mutated — so
+           they are not a nickase swap and do not exist on every backbone. */
+        if (cas.architectures && cas.architectures.indexOf(arch) < 0) return;
 
         var preference = familyCasPreference[parent.family + "|" + cas.id] || cas.pamPreference;
         var derived = {
@@ -643,6 +648,23 @@
         casIds[c.id] = true;
         if (!c.pam || !/^[ACGTRYSWKMBDHVN]+$/.test(c.pam)) problems.push(where + ": invalid pam");
         else casPam[c.id] = c.pam;
+        if (c.architectures !== undefined) {
+          if (!Array.isArray(c.architectures) || !c.architectures.length) {
+            problems.push(where + ": architectures must be a non-empty array");
+          } else {
+            /* A name that matches no parent editor would silently remove the
+               backbone from the results, so it is an error, not a no-op. */
+            c.architectures.forEach(function (arch) {
+              var exists = (data.editors || []).some(function (e) {
+                return e.id === arch && e.cas === "SpCas9";
+              });
+              if (!exists) {
+                problems.push(where + ": architecture \"" + arch +
+                  "\" matches no SpCas9 parent editor");
+              }
+            });
+          }
+        }
       });
     }
 

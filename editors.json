@@ -416,7 +416,13 @@
       "note": "Recognizes adenine-dinucleotide 5'-NAAN-3' PAMs, including AAAA sites that SpyMac edits poorly. Reaches targets no NGN or NGG backbone can, and complements SpRY where an A-rich PAM is all that is available.",
       "source": "wang2020ispymac",
       "zebrafishNote": "SpyMac has been used in a zebrafish cytosine base editor (ancBE4max-SpymacCas9, NAA PAM), but no iSpyMac pairing with the Umax editors has been reported, so every pairing below is predicted rather than tested.",
-      "untestedWithUmax": true
+      "untestedWithUmax": true,
+      "architectures": [
+        "ABE-Umax",
+        "TCBE-Umax",
+        "zAYE-1028"
+      ],
+      "architecturesNote": "Only the base editors are paired with this backbone. The ex1, ex2, rest and Umax2 variants modify the Cas9 protein itself - inserting the deaminase at a numbered residue, deleting the HNH domain, or mutating Cas9 - and no such construct exists on this backbone."
     }
   ]
 }

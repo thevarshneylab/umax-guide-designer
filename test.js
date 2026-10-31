@@ -503,8 +503,8 @@ derived.forEach(e => {
 (() => {
   const ispymac = expanded.filter(e => e.cas === "iSpyMac");
   check("iSpyMac pairings were generated", ispymac.length > 0);
-  check("every architecture gained an iSpyMac pairing",
-    ispymac.length === EDITORS.filter(e => e.cas === "SpCas9").length);
+  check("iSpyMac pairs only with the architectures its registry entry allows",
+    ispymac.length === CAS["iSpyMac"].architectures.length);
 
   /* An A at position 7 with only an AAA PAM downstream: unreachable with
      NGG/NGN, reachable with iSpyMac. */
@@ -648,6 +648,92 @@ equal("an empty sequence scans to nothing",
   UMAX.scanSequence("", "CBE", EDITORS, 0).editable, 0);
 equal("a sequence with no editable base scans to nothing",
   UMAX.scanSequence("AAAAAAAAAA", "CBE", EDITORS, 0).editable, 0);
+
+/* ------------------------------------------------------------------ *
+ * Backbone architecture restrictions
+ *
+ * A backbone may only be able to carry some architectures. The ex1, ex2,
+ * rest and Umax2 variants rebuild the Cas9 protein itself rather than
+ * swapping the nickase, so those constructs do not exist on every backbone
+ * and must not be offered as if they did.
+ * ------------------------------------------------------------------ */
+
+equal("iSpyMac restricts which architectures it carries",
+  Array.isArray(CAS["iSpyMac"].architectures), true);
+equal("iSpyMac carries only the base editors",
+  CAS["iSpyMac"].architectures.slice().sort(),
+  ["ABE-Umax", "TCBE-Umax", "zAYE-1028"]);
+
+(() => {
+  const ispymac = expanded.filter(e => e.cas === "iSpyMac");
+  equal("exactly one iSpyMac pairing per listed architecture",
+    ispymac.length, CAS["iSpyMac"].architectures.length);
+  check("every iSpyMac pairing is from a listed architecture",
+    ispymac.every(e => CAS["iSpyMac"].architectures.indexOf(e.basedOn) >= 0),
+    ispymac.map(e => e.id).join(", "));
+
+  /* The specific constructs that do not exist must be absent by name. */
+  ["ex1", "ex2", "rest1", "rest2", "ex1-rest1", "ex2-rest1", "Umax2"].forEach(v => {
+    check("no iSpyMac pairing for a " + v + " variant",
+      !ispymac.some(e => e.id.indexOf(v + "-iSpyMac") >= 0 ||
+                         e.id.indexOf("Umax2-iSpyMac") >= 0 && v === "Umax2"),
+      "found: " + ispymac.map(e => e.id).join(", "));
+  });
+})();
+
+/* Restricting one backbone must not touch the others. */
+["SpG", "Cas9-NG", "SpRY"].forEach(casId => {
+  check(casId + " is not restricted", !CAS[casId].architectures);
+  const paired = expanded.filter(e => e.cas === casId);
+  check(casId + " still pairs with the ex and rest variants",
+    paired.some(e => /-(ex1|ex2|rest1|rest2)-/.test(e.id) || /-(ex1|ex2|rest1|rest2)$/.test(e.basedOn || "")),
+    paired.map(e => e.id).join(", "));
+});
+
+/* A restriction naming an architecture that does not exist would silently
+   drop the backbone, so it must be rejected rather than ignored. */
+(() => {
+  const broken = JSON.parse(JSON.stringify(data));
+  broken.casVariants.find(c => c.id === "iSpyMac").architectures = ["ABE-Umax", "No-Such-Editor"];
+  const problems = UMAX.validateEditors(broken);
+  check("an unknown architecture name is rejected",
+    problems.some(m => /matches no SpCas9 parent editor/.test(m)), problems.join("; "));
+})();
+(() => {
+  const broken = JSON.parse(JSON.stringify(data));
+  broken.casVariants.find(c => c.id === "iSpyMac").architectures = [];
+  const problems = UMAX.validateEditors(broken);
+  check("an empty architecture list is rejected",
+    problems.some(m => /non-empty array/.test(m)), problems.join("; "));
+})();
+
+/* A backbone with no restriction keeps pairing with everything, so removing
+   the key restores the previous behaviour rather than breaking expansion. */
+(() => {
+  const unrestricted = JSON.parse(JSON.stringify(data));
+  delete unrestricted.casVariants.find(c => c.id === "iSpyMac").architectures;
+  const wide = UMAX.expandEditors(unrestricted, { includeUntested: true });
+  const parents = unrestricted.editors.filter(e => e.cas === "SpCas9").length;
+  equal("without a restriction iSpyMac pairs with every architecture",
+    wide.filter(e => e.cas === "iSpyMac").length, parents);
+})();
+
+/* Guides from the surviving pairings must still be sound. */
+(() => {
+  const ispymac = expanded.filter(e => e.cas === "iSpyMac");
+  let found = 0;
+  for (let i = 0; i < EXAMPLE.length; i++) {
+    if (!UMAX.guideStrandFor(EXAMPLE.charAt(i), "CBE")) continue;
+    UMAX.design(EXAMPLE, i, "CBE", ispymac, FRAME).forEach(g => {
+      found++;
+      check("iSpyMac guide at base " + (i + 1) + " uses an NAA PAM",
+        UMAX.matchesPam(g.pam, "NAA"), g.pam);
+      equal("iSpyMac guide at base " + (i + 1) + " comes from the base editor",
+        g.editor.basedOn, "TCBE-Umax");
+    });
+  }
+  check("the restricted set still designs guides", found > 0);
+})();
 
 /* ------------------------------------------------------------------ *
  * Report
