@@ -21,7 +21,10 @@
     seq: "", target: -1, family: "CBE", frame: 0, filter: "all",
     guides: [], editors: [], allEditors: [], sources: [],
     casVariants: [], casEnabled: {}, includeUntested: false,
-    mode: "one", consequence: "any", scan: null, scanConfirmed: false
+    mode: "one", consequence: "any", scan: null, scanConfirmed: false,
+    /* Scan mode is multi-family: the published transition editors are on by
+       default, the unpublished transversion family opt-in. */
+    scanFamilies: { ABE: true, CBE: true, AYE: false }
   };
 
   /* Above this much work a synchronous scan would visibly freeze the tab, so
@@ -384,12 +387,43 @@
     return "No editors available for the current selection.";
   }
 
+  function activeFamilies() {
+    return Object.keys(UMAX.FAMILY).filter(function (f) { return state.scanFamilies[f]; });
+  }
+
   function scanWorkUnits() {
     var editable = 0;
-    for (var i = 0; i < state.seq.length; i++) {
-      if (UMAX.guideStrandFor(state.seq.charAt(i), state.family)) editable++;
-    }
+    activeFamilies().forEach(function (fam) {
+      for (var i = 0; i < state.seq.length; i++) {
+        if (UMAX.guideStrandFor(state.seq.charAt(i), fam)) editable++;
+      }
+    });
     return editable * Math.max(1, state.editors.length);
+  }
+
+  function renderFamilyFilter() {
+    var box = $("familyfilter");
+    box.textContent = "";
+    Object.keys(UMAX.FAMILY).forEach(function (fam) {
+      var def = UMAX.FAMILY[fam];
+      var unpublished = fam === "AYE";
+      var label = document.createElement("label");
+      label.className = "chip" + (unpublished ? " predonly" : "");
+      label.innerHTML = '<input type="checkbox"><span class="cname"></span>' +
+        '<span class="cpam"></span><span class="conly"></span>';
+      var input = label.querySelector("input");
+      input.checked = !!state.scanFamilies[fam];
+      input.setAttribute("aria-label", fam + ", " + def.label);
+      label.querySelector(".cname").textContent = fam;
+      label.querySelector(".cpam").textContent = def.label;
+      label.querySelector(".conly").textContent = unpublished ? "unpublished" : "";
+      input.addEventListener("change", function () {
+        state.scanFamilies[fam] = this.checked;
+        state.scanConfirmed = false;
+        render();
+      });
+      box.appendChild(label);
+    });
   }
 
   function scanRowMatches(entry) {
@@ -438,17 +472,28 @@
       return;
     }
 
-    var scan = UMAX.scanSequence(state.seq, state.family, state.editors, state.frame);
+    var families = activeFamilies();
+    if (!families.length) {
+      var nofam = document.createElement("div");
+      nofam.className = "empty";
+      nofam.textContent = "No editor family selected — tick at least one above.";
+      box.appendChild(nofam);
+      $("count").textContent = "";
+      return;
+    }
+
+    var scan = UMAX.scanFamilies(state.seq, families, state.editors, state.frame);
     state.scan = scan;
 
     var rows = scan.entries.filter(function (e) { return e.guideCount > 0 && scanRowMatches(e); });
-    $("count").textContent = "· " + rows.length + " of " + scan.reachable + " editable bases";
+    $("count").textContent = "· " + rows.length + " of " + scan.reachable +
+      (families.length > 1 ? " rows across " + scan.positions + " positions" : " editable bases");
 
     var stats = document.createElement("div");
     stats.className = "scanstats";
     var unreachable = scan.editable - scan.reachable;
     [
-      ["Editable bases", scan.editable],
+      ["Editable", scan.editable + (families.length > 1 ? " (base × family)" : " bases")],
       ["With a guide", scan.reachable],
       ["No guide", unreachable],
       ["Guides total", scan.totalGuides]
@@ -467,7 +512,7 @@
 
       /* Distinguish "the selection is hiding everything" from "this sequence
          genuinely has nothing", the same way the single-base view does. */
-      var wider = UMAX.scanSequence(state.seq, state.family, state.allEditors, state.frame);
+      var wider = UMAX.scanFamilies(state.seq, families, state.allEditors, state.frame);
       var widerRows = wider.entries.filter(function (e) {
         return e.guideCount > 0 && scanRowMatches(e);
       });
@@ -503,9 +548,10 @@
     wrap.className = "scanwrap";
     var table = document.createElement("table");
     table.className = "scantable";
+    var multi = families.length > 1;
     table.innerHTML =
       "<thead><tr>" +
-        "<th>Base</th><th>Change</th><th>Consequence</th>" +
+        "<th>Base</th>" + (multi ? "<th>Family</th>" : "") + "<th>Change</th><th>Consequence</th>" +
         "<th>Best editor</th><th>Spacer + PAM</th><th>Pos</th>" +
         "<th>Byst.</th><th>Guides</th>" +
       "</tr></thead><tbody></tbody>";
@@ -529,7 +575,10 @@
             : (e.spectrum[0].description || "—"));
 
       var cells = [
-        ["mono", String(e.position) + " " + e.base],
+        ["mono", String(e.position) + " " + e.base]
+      ];
+      if (multi) cells.push(["", e.family]);
+      cells = cells.concat([
         ["mono", change],
         ["tag-" + e.effectClass, consequence],
         ["", g.editor.id + (g.editor.derived ? " (predicted)" : "")],
@@ -537,7 +586,7 @@
         ["mono", String(g.position)],
         ["mono", g.bystanders.length ? String(g.bystanders.length) : "—"],
         ["mono", String(e.guideCount)]
-      ];
+      ]);
       cells.forEach(function (c) {
         var td = document.createElement("td");
         if (c[0]) td.className = c[0];
@@ -547,6 +596,9 @@
 
       function open() {
         state.target = e.index;
+        state.family = e.family;
+        $("edit").value = e.family;
+        $("ayenotice").hidden = !UMAX.FAMILY[e.family].mixedProducts;
         $("pos").value = String(e.position);
         setMode("one");
       }
@@ -578,6 +630,10 @@
     $("scanresults").hidden = mode !== "all";
     $("consequence").hidden = mode !== "all";
     $("filter").hidden = mode !== "one";
+    $("familypanel").hidden = mode !== "all";
+    /* "Edit to make" picks one chemistry; scan mode picks a set, so the two
+       controls are never shown together. */
+    $("edit").closest(".field").hidden = mode !== "one";
     render();
   }
 
@@ -714,7 +770,7 @@
 
   function copyScan() {
     if (!state.scan) { toast("Run the scan first"); return; }
-    var header = ["base_position", "base", "change", "consequence", "effect_class",
+    var header = ["base_position", "base", "family", "change", "consequence", "effect_class",
                   "editor", "cas9", "evidence", "strand", "spacer_5to3", "pam",
                   "target_position", "bystander_positions", "gc_percent",
                   "context", "guides_for_this_base"];
@@ -732,7 +788,8 @@
             return o.observedBase + ":" + (o.description || "");
           }).join(" | ");
       rows.push([
-        e.position, e.base, change, consequence, e.effectClasses.join("|"),
+        e.position, e.base, e.family || state.family, change, consequence,
+        e.effectClasses.join("|"),
         g.editor.id, g.editor.cas,
         g.editor.derived ? "predicted pairing" : (g.editor.unpublished ? "unpublished" : "published"),
         g.strand, g.spacer, g.pam, g.position,
@@ -784,6 +841,7 @@
         state.casEnabled[c.id] = state.casHasPublished[c.id];
       });
       renderCasFilter();
+      renderFamilyFilter();
       renderReference();
       $("consequence").hidden = true;
       wire();

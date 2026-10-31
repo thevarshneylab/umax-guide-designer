@@ -261,6 +261,12 @@ a{color:var(--accent)}
 </section>
 
 <section>
+  <div class="panel" id="familypanel" style="margin-bottom:16px" hidden>
+    <p class="eyebrow" style="margin:0 0 4px">Editor families to scan</p>
+    <p class="hint" style="margin:0 0 10px">Scan with more than one chemistry at once. A and T can be reached by the adenine editors, C and G by the cytosine ones, so a base may appear on more than one row.</p>
+    <div id="familyfilter" class="chips"></div>
+  </div>
+
   <div class="panel" style="margin-bottom:16px">
     <p class="eyebrow" style="margin:0 0 4px">Cas9 backbone · PAM</p>
     <p class="hint" style="margin:0 0 10px">Restrict the search to the nickases you have. The backbone sets the PAM; the editing window comes from the deaminase architecture.</p>
@@ -307,7 +313,7 @@ a{color:var(--accent)}
       Windows are counted from the PAM-distal end of the 20-nt protospacer, with the PAM at positions 21–23.
       Editors marked unpublished come from a manuscript in preparation and may change.
       ABE-Umax-nanos1 carries the <em>nanos1</em> 3′UTR for germline-restricted editing and shares ABE-Umax's window and PAM; pick it when biallelic F0 editing would be lethal.
-      Parameters live in <a href="editors.json?v=5ed8fd98f4">editors.json</a>.
+      Parameters live in <a href="editors.json?v=04929ad5a6">editors.json</a>.
     </p>
   </details>
 </section>
@@ -333,7 +339,7 @@ a{color:var(--accent)}
 
 </div>
 
-<script src="umax.js?v=5ed8fd98f4"></script>
-<script src="app.js?v=5ed8fd98f4"></script>
+<script src="umax.js?v=04929ad5a6"></script>
+<script src="app.js?v=04929ad5a6"></script>
 </body>
 </html>

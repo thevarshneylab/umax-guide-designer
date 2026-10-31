@@ -537,6 +537,63 @@
     };
   }
 
+  /**
+   * Scan one sequence with several editor families at once.
+   *
+   * A and T are editable by both the adenine families, C and G only by the
+   * cytosine one, so a base can yield more than one entry — the same position
+   * reached by different chemistry with a different outcome. Each entry
+   * carries its own `family`, and entries are ordered by position so the
+   * table reads along the sequence.
+   *
+   * @param {string[]} families  family keys, e.g. ["ABE", "CBE"]
+   * @returns {{entries, totalGuides, reachable, editable, byFamily}}
+   */
+  function scanFamilies(seq, families, editors, frame, options) {
+    var order = {};
+    families.forEach(function (fam, i) { order[fam] = i; });
+
+    var entries = [];
+    var totalGuides = 0;
+    var reachable = 0;
+    var editable = 0;
+    var byFamily = {};
+
+    families.forEach(function (family) {
+      var one = scanSequence(seq, family, editors, frame, options);
+      byFamily[family] = {
+        editable: one.editable,
+        reachable: one.reachable,
+        totalGuides: one.totalGuides
+      };
+      totalGuides += one.totalGuides;
+      reachable += one.reachable;
+      editable += one.editable;
+      one.entries.forEach(function (e) {
+        e.family = family;
+        entries.push(e);
+      });
+    });
+
+    entries.sort(function (a, b) {
+      return a.index - b.index || order[a.family] - order[b.family];
+    });
+
+    return {
+      entries: entries,
+      totalGuides: totalGuides,
+      reachable: reachable,
+      editable: editable,
+      byFamily: byFamily,
+      /* Distinct sequence positions touched, as opposed to rows: a base an
+         adenine editor and a transversion editor can both reach counts once
+         here and twice in `entries`. */
+      positions: Object.keys(entries.reduce(function (acc, e) {
+        acc[e.index] = true; return acc;
+      }, {})).length
+    };
+  }
+
   /* ------------------------------------------------------------------ *
    * Cas9 backbones
    * ------------------------------------------------------------------ *
@@ -721,6 +778,7 @@
     scoreGuide: scoreGuide,
     design: design,
     scanSequence: scanSequence,
+    scanFamilies: scanFamilies,
     effectClass: effectClass,
     expandEditors: expandEditors,
     architectureOf: architectureOf,

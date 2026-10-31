@@ -736,6 +736,103 @@ equal("iSpyMac carries only the base editors",
 })();
 
 /* ------------------------------------------------------------------ *
+ * Multi-family scanning
+ *
+ * A and T are reachable by both adenine families, C and G only by the
+ * cytosine one, so one position can produce several rows - the same base
+ * reached by different chemistry with a different outcome.
+ * ------------------------------------------------------------------ */
+
+const both = UMAX.scanFamilies(EXAMPLE, ["ABE", "CBE"], EDITORS, FRAME);
+const abeOnly = UMAX.scanSequence(EXAMPLE, "ABE", EDITORS, FRAME);
+const cbeOnly = UMAX.scanSequence(EXAMPLE, "CBE", EDITORS, FRAME);
+
+equal("a two-family scan merges both families' rows",
+  both.entries.length, abeOnly.entries.length + cbeOnly.entries.length);
+equal("and sums their guides",
+  both.totalGuides, abeOnly.totalGuides + cbeOnly.totalGuides);
+equal("and sums their reachable counts",
+  both.reachable, abeOnly.reachable + cbeOnly.reachable);
+
+check("every row carries the family that produced it",
+  both.entries.every(e => e.family === "ABE" || e.family === "CBE"));
+equal("per-family totals are reported",
+  both.byFamily.ABE.totalGuides, abeOnly.totalGuides);
+equal("per-family reachable counts are reported",
+  both.byFamily.CBE.reachable, cbeOnly.reachable);
+
+/* ABE and CBE partition the four bases, so together they cover every
+   position exactly once and nothing is double-counted. */
+equal("ABE and CBE together cover the whole sequence once",
+  both.positions, EXAMPLE.length);
+equal("with no position appearing twice", both.entries.length, both.positions);
+
+/* Rows must read along the sequence, whatever order the families are given. */
+check("entries are ordered by position",
+  both.entries.every((e, i) => i === 0 || e.index >= both.entries[i - 1].index));
+(() => {
+  const flipped = UMAX.scanFamilies(EXAMPLE, ["CBE", "ABE"], EDITORS, FRAME);
+  equal("family order does not change the row count",
+    flipped.entries.length, both.entries.length);
+  check("and the rows are still in sequence order",
+    flipped.entries.every((e, i) => i === 0 || e.index >= flipped.entries[i - 1].index));
+})();
+
+/* Adding the transversion family must double up on A and T, never on C/G. */
+(() => {
+  const three = UMAX.scanFamilies(EXAMPLE, ["ABE", "CBE", "AYE"], EDITORS, FRAME);
+  const ayeOnly = UMAX.scanSequence(EXAMPLE, "AYE", EDITORS, FRAME);
+  equal("three families merge to the sum of their rows",
+    three.entries.length, both.entries.length + ayeOnly.entries.length);
+  check("it still covers the same positions", three.positions === EXAMPLE.length);
+  check("so some positions now carry more than one row",
+    three.entries.length > three.positions);
+
+  /* Precisely: every A and T should appear twice (ABE and AYE), every C and
+     G once (CBE). */
+  const perIndex = {};
+  three.entries.forEach(e => { perIndex[e.index] = (perIndex[e.index] || 0) + 1; });
+  let ok = true;
+  for (let i = 0; i < EXAMPLE.length; i++) {
+    const expected = "AT".indexOf(EXAMPLE.charAt(i)) >= 0 ? 2 : 1;
+    if ((perIndex[i] || 0) !== expected) ok = false;
+  }
+  check("A and T carry an adenine and a transversion row; C and G carry one", ok);
+})();
+
+/* A single-family call through the multi-family entry point must be
+   identical to scanning that family directly - no drift between paths. */
+(() => {
+  const viaMulti = UMAX.scanFamilies(EXAMPLE, ["CBE"], EDITORS, FRAME);
+  equal("one family through scanFamilies matches scanSequence (rows)",
+    viaMulti.entries.length, cbeOnly.entries.length);
+  equal("one family through scanFamilies matches scanSequence (guides)",
+    viaMulti.totalGuides, cbeOnly.totalGuides);
+  check("and base for base",
+    viaMulti.entries.every((e, i) =>
+      e.index === cbeOnly.entries[i].index &&
+      e.guideCount === cbeOnly.entries[i].guideCount));
+})();
+
+/* The knockout workflow: every premature stop in a region, by any chemistry. */
+(() => {
+  const stops = both.entries.filter(e => e.effectClass === "nonsense");
+  check("a two-family scan finds premature stops", stops.length > 0);
+  check("each names the family that makes it",
+    stops.every(e => e.family === "ABE" || e.family === "CBE"));
+  const cbeStops = cbeOnly.entries.filter(e => e.effectClass === "nonsense").length;
+  const abeStops = abeOnly.entries.filter(e => e.effectClass === "nonsense").length;
+  equal("and finds every stop either family finds alone",
+    stops.length, cbeStops + abeStops);
+})();
+
+/* Degenerate input. */
+equal("no families scans to nothing",
+  UMAX.scanFamilies(EXAMPLE, [], EDITORS, FRAME).entries.length, 0);
+equal("an empty sequence scans to nothing",
+  UMAX.scanFamilies("", ["ABE", "CBE"], EDITORS, FRAME).entries.length, 0);
+
+/* ------------------------------------------------------------------ *
  * Report
  * ------------------------------------------------------------------ */
 

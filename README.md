@@ -57,9 +57,9 @@ Note that **rest2 does not win here**, even though it is the narrowest editor. I
 
 **One base.** Click the base you want changed and get every guide that can reach it, ranked. This is the variant-modelling workflow: you know the substitution, you need the best way to install it.
 
-**Scan whole sequence.** Paste a region and get one row per editable base, each with its best guide and the protein consequence. This is the other direction — you have a region and want to know what it is possible to do to it. Filter by consequence to answer specific questions:
+**Scan whole sequence.** Paste a region and get one row per editable base, each with its best guide and the protein consequence. Scan with more than one chemistry at once: ABE and CBE are on by default, which between them cover all four bases, so every position in the region is accounted for in a single pass. Tick the transversion family too and A and T gain a second row each, since those bases are reachable by both adenine chemistries with different outcomes. Each row names the family that produced it, and clicking through switches the single-base view to that chemistry. This is the other direction — you have a region and want to know what it is possible to do to it. Filter by consequence to answer specific questions:
 
-- *Premature stop only* lists every base whose edit creates a stop codon, which is the F0 knockout workflow: pick whichever has a clean guide in a favourable position.
+- *Premature stop only* lists every base whose edit creates a stop codon, across every selected chemistry, which is the F0 knockout workflow: pick whichever has a clean guide in a favourable position. Scanning ABE and CBE together is the point here — a region with no good CGA→TGA site may still have a usable one the adenine editors reach.
 - *Silent only* finds edits that change the sequence without changing the protein, useful for a restriction site or a genotyping handle.
 - *Missense only* is the variant-modelling survey across a whole exon.
 
