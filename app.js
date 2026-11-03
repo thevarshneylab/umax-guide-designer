@@ -667,7 +667,11 @@
 
     var cites = $("citations");
     cites.textContent = "Editor parameters from: " +
-      state.sources.map(function (s) { return s.citation + " doi:" + s.doi; }).join(" · ");
+      state.sources.map(function (s) {
+        /* Work in preparation has no DOI yet, and a bare "doi:" reads as a
+           missing value rather than as one that does not exist. */
+        return s.citation + (s.doi ? " doi:" + s.doi : "");
+      }).join(" · ");
   }
 
   /* ---------- clipboard ---------- */

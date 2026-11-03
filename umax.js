@@ -725,6 +725,26 @@
       });
     }
 
+    /* Source keys referenced by editors and backbones must resolve, or a
+       citation removed later leaves a dangling reference nothing reports. */
+    var sourceKeys = {};
+    if (Array.isArray(data.sources)) {
+      data.sources.forEach(function (s, i) {
+        if (!s.key) problems.push("sources entry " + i + ": missing key");
+        else if (sourceKeys[s.key]) problems.push("sources " + s.key + ": duplicate key");
+        else sourceKeys[s.key] = true;
+        if (!s.citation) problems.push("sources " + (s.key || i) + ": missing citation");
+      });
+    }
+    if (Array.isArray(data.casVariants)) {
+      data.casVariants.forEach(function (c) {
+        if (c.source && !sourceKeys[c.source]) {
+          problems.push("casVariants " + c.id + ": source \"" + c.source +
+            "\" is not in sources");
+        }
+      });
+    }
+
     var ids = {};
     data.editors.forEach(function (ed, i) {
       var where = ed.id || "entry " + i;
@@ -745,6 +765,9 @@
         }
       }
       if (!ed.use) problems.push(where + ": missing `use` note");
+      if (ed.source && Object.keys(sourceKeys).length && !sourceKeys[ed.source]) {
+        problems.push(where + ": source \"" + ed.source + "\" is not in sources");
+      }
       if (casPam[ed.cas] && ed.pam !== casPam[ed.cas]) {
         problems.push(where + ": pam " + ed.pam + " disagrees with the " + ed.cas +
           " registry entry (" + casPam[ed.cas] + ")");

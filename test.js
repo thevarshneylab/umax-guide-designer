@@ -833,6 +833,55 @@ equal("an empty sequence scans to nothing",
   UMAX.scanFamilies("", ["ABE", "CBE"], EDITORS, FRAME).entries.length, 0);
 
 /* ------------------------------------------------------------------ *
+ * Citations
+ * ------------------------------------------------------------------ */
+
+(() => {
+  const keys = data.sources.map(s => s.key);
+  equal("no duplicate source keys", new Set(keys).size, keys.length);
+  check("every source carries a citation", data.sources.every(s => !!s.citation));
+
+  /* Every key referenced anywhere must resolve. */
+  EDITORS.forEach(ed => {
+    if (ed.source) {
+      check(ed.id + " cites a source that exists", keys.indexOf(ed.source) >= 0, ed.source);
+    }
+  });
+  data.casVariants.forEach(c => {
+    if (c.source) {
+      check(c.id + " cites a source that exists", keys.indexOf(c.source) >= 0, c.source);
+    }
+  });
+
+  /* The iSpyMac backbone is attributed to the paper that described it. */
+  const ispymacSource = data.sources.find(s => s.key === CAS["iSpyMac"].source);
+  check("iSpyMac cites a source", !!ispymacSource);
+  if (ispymacSource) {
+    check("attributed to Chatterjee et al.", /Chatterjee/.test(ispymacSource.citation),
+      ispymacSource.citation);
+    equal("with the adenine-dinucleotide Cas9 DOI",
+      ispymacSource.doi, "10.1038/s41467-020-16117-8");
+  }
+})();
+
+/* A citation removed while something still points at it must fail loudly,
+   rather than leaving a reference that resolves to nothing. */
+(() => {
+  const broken = JSON.parse(JSON.stringify(data));
+  broken.sources = broken.sources.filter(s => s.key !== CAS["iSpyMac"].source);
+  const problems = UMAX.validateEditors(broken);
+  check("a dangling source reference is rejected",
+    problems.some(m => /is not in sources/.test(m)), problems.join("; "));
+})();
+(() => {
+  const broken = JSON.parse(JSON.stringify(data));
+  broken.sources.push({ key: broken.sources[0].key, citation: "duplicate" });
+  const problems = UMAX.validateEditors(broken);
+  check("a duplicate source key is rejected",
+    problems.some(m => /duplicate key/.test(m)), problems.join("; "));
+})();
+
+/* ------------------------------------------------------------------ *
  * Report
  * ------------------------------------------------------------------ */
 

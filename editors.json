@@ -19,14 +19,9 @@
       "note": "Parameters below are taken from the manuscript and may change before publication."
     },
     {
-      "key": "wang2020ispymac",
+      "key": "chatterjee2020",
       "citation": "Chatterjee P, Jakimo N, Lee J, et al. A Cas9 with PAM recognition for adenine dinucleotides. Nat Commun. 2020;11:2474.",
       "doi": "10.1038/s41467-020-16117-8"
-    },
-    {
-      "key": "rosello2022",
-      "citation": "Rosello M, Serafini M, Mignani L, et al. Disease modeling by efficient genome editing using a near PAM-less base editor in vivo. Nat Commun. 2022;13:3435.",
-      "doi": "10.1038/s41467-022-31172-z"
     }
   ],
   "editors": [
@@ -414,8 +409,8 @@
       "id": "iSpyMac",
       "pam": "NAA",
       "note": "Recognizes adenine-dinucleotide 5'-NAAN-3' PAMs, including AAAA sites that SpyMac edits poorly. Reaches targets no NGN or NGG backbone can, and complements SpRY where an A-rich PAM is all that is available.",
-      "source": "wang2020ispymac",
-      "zebrafishNote": "SpyMac has been used in a zebrafish cytosine base editor (ancBE4max-SpymacCas9, NAA PAM), but no iSpyMac pairing with the Umax editors has been reported, so every pairing below is predicted rather than tested.",
+      "source": "chatterjee2020",
+      "zebrafishNote": "No iSpyMac pairing with the Umax editors has been reported, so every pairing is predicted rather than tested.",
       "untestedWithUmax": true,
       "architectures": [
         "ABE-Umax",
